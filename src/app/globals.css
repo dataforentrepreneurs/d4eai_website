@@ -1,26 +1,86 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #050014;
+  --foreground: #FFFFFF;
+  
+  --color-obsidian: #050014;
+  --color-slate: #110B29;
+  --color-cyan: #66FCF1;
+  --color-cyan-dim: #45A29E;
+  --color-violet: #8A2BE2;
+  --color-violet-light: #A05BEE;
+  --color-neon-purple: #B200FF;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-obsidian: var(--color-obsidian);
+  --color-slate: var(--color-slate);
+  --color-electric-cyan: var(--color-cyan);
+  --color-electric-cyan-dim: var(--color-cyan-dim);
+  --color-electric-violet: var(--color-violet);
+  --color-electric-violet-light: var(--color-violet-light);
+  --color-neon-purple: var(--color-neon-purple);
+  
+  --font-sans: var(--font-geist-sans), Inter, sans-serif;
+  --font-mono: var(--font-geist-mono), monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+/* Glassmorphism Utilities */
+@utility glass {
+  background: rgba(17, 11, 41, 0.4);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(138, 43, 226, 0.2);
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+}
+
+@utility glass-card {
+  background: rgba(17, 11, 41, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(138, 43, 226, 0.3);
+  border-radius: 1rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+  transition: all 0.3s ease-in-out;
+}
+
+@utility glass-card-hover {
+  border-color: rgba(178, 0, 255, 0.6);
+  box-shadow: 0 8px 32px rgba(178, 0, 255, 0.2);
+  transform: translateY(-4px);
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  overflow-x: hidden;
+}
+
+/* Smooth Scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Custom Selection */
+::selection {
+  background: var(--color-neon-purple);
+  color: var(--color-foreground);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-obsidian);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-slate);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-cyan-dim);
 }
