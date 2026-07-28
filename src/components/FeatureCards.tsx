@@ -1,20 +1,24 @@
+
 "use client";
 
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { Database, Bot, LineChart, Shield } from "lucide-react";
+import { Zap, Bot, LineChart, Shield } from "lucide-react";
 
 const features = [
   {
-    icon: <Database className="w-8 h-8" />,
-    title: "Data Pipelines",
-    description: "Automated, scalable infrastructure tailored for early-stage startups and growing businesses.",
-    color: "text-electric-cyan"
+    icon: <Zap className="w-8 h-8" />,
+    title: "Data In A Day (DIAD)",
+    description: "1-click deployment engine. Turn store data into AI chatbots running entirely in your GCP project.",
+    color: "text-electric-cyan",
+    href: "/diad"
   },
   {
     icon: <Bot className="w-8 h-8" />,
     title: "Agentic Chatbots",
     description: "Deploy pro-level, LLM-powered bots with RAG architecture and zero third-party lock-in.",
-    color: "text-electric-violet-light"
+    color: "text-electric-violet-light",
+    href: "/diad"
   },
   {
     icon: <LineChart className="w-8 h-8" />,
@@ -42,24 +46,44 @@ export default function FeatureCards() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {features.map((feature, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
-              className="glass-card p-8 group glass-card-hover"
-            >
-              <div className={`mb-6 p-4 rounded-xl inline-block bg-slate/50 border border-slate group-hover:border-[rgba(102,252,241,0.3)] transition-colors ${feature.color}`}>
-                {feature.icon}
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">{feature.title}</h3>
-              <p className="text-gray-400 text-sm leading-relaxed">
-                {feature.description}
-              </p>
-            </motion.div>
-          ))}
+          {features.map((feature, index) => {
+            const cardContent = (
+              <>
+                <div className={`mb-6 p-4 rounded-xl inline-block bg-slate/50 border border-slate group-hover:border-[rgba(102,252,241,0.3)] transition-colors ${feature.color}`}>
+                  {feature.icon}
+                </div>
+                <h3 className="text-xl font-bold text-white mb-3">{feature.title}</h3>
+                <p className="text-gray-400 text-sm leading-relaxed">
+                  {feature.description}
+                </p>
+              </>
+            );
+
+            return feature.href ? (
+              <Link key={index} href={feature.href} className="block">
+                <motion.div
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: index * 0.1 }}
+                  className="glass-card p-8 group glass-card-hover border-electric-cyan/30 h-full cursor-pointer"
+                >
+                  {cardContent}
+                </motion.div>
+              </Link>
+            ) : (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                className="glass-card p-8 group glass-card-hover h-full"
+              >
+                {cardContent}
+              </motion.div>
+            );
+          })}
         </div>
       </div>
     </section>
