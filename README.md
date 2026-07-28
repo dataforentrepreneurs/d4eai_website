@@ -7,7 +7,7 @@ Official Next.js web portal for **Data for Entrepreneurs (D4E.AI)**, showcasing 
 ## 🌐 Live URLs & Links
 
 * **Main Website**: [https://d4e.ai](https://d4e.ai)
-* **DIAD Product Page**: [https://d4e.ai/diad](https://d4e.ai/diad)
+* **DIAD Product Subdomain**: [https://diad.d4e.ai](https://diad.d4e.ai) (also available at [https://d4e.ai/diad](https://d4e.ai/diad))
 * **Party Games Hub**: [https://play.d4e.ai](https://play.d4e.ai)
 * **GitHub Repository**: [https://github.com/dataforentrepreneurs/d4eai_website](https://github.com/dataforentrepreneurs/d4eai_website)
 * **GitHub Pages Origin**: `https://dataforentrepreneurs.github.io/d4eai_website/`
