@@ -486,14 +486,14 @@ export default function TrustCenter() {
                   </div>
                   <div className="flex items-center gap-3">
                     <Link
-                      href="/terms"
+                      href="/diad/terms"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-electric-violet/30 text-electric-cyan border border-electric-cyan/40 text-xs font-semibold hover:bg-electric-violet/50 transition-colors"
                     >
                       Master Terms
                       <ExternalLink className="w-3 h-3" />
                     </Link>
                     <Link
-                      href="/privacy"
+                      href="/diad/privacy"
                       className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-electric-violet/30 text-electric-cyan border border-electric-cyan/40 text-xs font-semibold hover:bg-electric-violet/50 transition-colors"
                     >
                       Privacy Policy
@@ -519,28 +519,28 @@ export default function TrustCenter() {
                   <div className="bg-obsidian/70 p-5 rounded-xl border border-slate">
                     <h4 className="font-bold text-white text-sm mb-2 flex items-center gap-2">
                       <Lock className="w-4 h-4 text-neon-purple" />
-                      Free Beta Evaluation & Logo Exchange
+                      Free Community License & Logo Exchange
                     </h4>
                     <p className="text-xs text-gray-300 leading-relaxed mb-3">
-                      Pilot partners evaluate DIAD with S$0 software fees for 90 days in exchange for a non-exclusive license to feature their brand logo and written testimonial on d4e.ai. Mutual S$0 liability cap during beta.
+                      DIAD is provided free of software licensing fees (S$0) in exchange for a non-exclusive license to feature your brand logo on d4e.ai. No arbitrary trial deadlines. We guarantee at least 30 days advance notice before any future pricing updates.
                     </p>
                     <div className="text-[0.7rem] font-mono text-neon-purple bg-neon-purple/10 p-2 rounded border border-neon-purple/20">
-                      ✔ Protected 90-Day evaluation with 14-day mutual cancellation notice.
+                      ✔ Free Self-Hosted Deployment with 30-Day Transition Notice Guarantee.
                     </div>
                   </div>
                 </div>
 
-                {/* DPA & SLA Summary */}
+                {/* DPA & Support Model Summary */}
                 <div className="bg-obsidian/70 p-5 rounded-xl border border-slate text-xs text-gray-300 space-y-3">
-                  <h4 className="font-bold text-white text-sm">Data Processing Addendum (Singapore PDPA 2012 & EU GDPR)</h4>
+                  <h4 className="font-bold text-white text-sm">Data Processing Addendum & Support Model</h4>
                   <p className="leading-relaxed">
                     Customer designates itself as Data Controller; Data for Entrepreneurs acts as Data Intermediary/Processor. Complies with PDPA Protection Obligation and Transfer Limitation Obligation. Integrates EU GDPR Module 2 Standard Contractual Clauses (SCCs).
                   </p>
                   <div className="pt-2 border-t border-slate flex flex-wrap gap-4 text-gray-400">
-                    <span>SLA Targets: <strong className="text-white">P1 Critical &lt; 4h</strong></span>
-                    <span>P2 Major &lt; 12h</span>
-                    <span>P3 General &lt; 2 business days</span>
-                    <span>Zero-Day CVE Patches: <strong className="text-white">&lt; 48 hours</strong></span>
+                    <span>Support: <strong className="text-white">Self-Hosted / Best-Effort Founder Guidance</strong></span>
+                    <span>Service Level: <strong className="text-white">Community Tier (Zero SLA Liabilities)</strong></span>
+                    <span>Pricing Changes: <strong className="text-white">30-Day Advance Written Notice</strong></span>
+                    <span>Customer Data: <strong className="text-white">100% Retained in BigQuery</strong></span>
                   </div>
                 </div>
               </motion.div>
