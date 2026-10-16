@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import TrustCenter from "@/components/TrustCenter";
+import PilotRegistrationModal from "@/components/PilotRegistrationModal";
 import { motion } from "framer-motion";
 import {
   Terminal,
@@ -26,10 +27,35 @@ import {
 export default function DiadPage() {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<"customer" | "internal">("customer");
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   const psCommand = `irm https://raw.githubusercontent.com/dataforentrepreneurs/DIAD_Scaffold/main/setup.ps1 | iex`;
 
+  const handleDownloadClick = (e?: React.MouseEvent) => {
+    if (e) e.preventDefault();
+    try {
+      const existingLead = localStorage.getItem("diad_pilot_lead");
+      if (existingLead) {
+        const link = document.createElement("a");
+        link.href = "/setup.bat";
+        link.download = "setup.bat";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        return;
+      }
+    } catch {}
+    setIsModalOpen(true);
+  };
+
   const handleCopy = () => {
+    try {
+      const existingLead = localStorage.getItem("diad_pilot_lead");
+      if (!existingLead) {
+        setIsModalOpen(true);
+        return;
+      }
+    } catch {}
     navigator.clipboard.writeText(psCommand);
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
@@ -138,14 +164,13 @@ export default function DiadPage() {
               </div>
             </div>
 
-            <a
-              href="/setup.bat"
-              download="setup.bat"
-              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-electric-violet to-neon-purple text-white font-semibold text-sm hover:opacity-90 transition-all shadow-lg shadow-neon-purple/20 flex-shrink-0"
+            <button
+              onClick={handleDownloadClick}
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-electric-violet to-neon-purple text-white font-semibold text-sm hover:opacity-90 transition-all shadow-lg shadow-neon-purple/20 flex-shrink-0 cursor-pointer"
             >
               <Download className="w-4 h-4" />
               Download 1-Click Installer (.bat)
-            </a>
+            </button>
           </div>
 
           <p className="text-sm text-gray-300 mb-4 leading-relaxed">
@@ -358,15 +383,20 @@ export default function DiadPage() {
             </code>
           </div>
 
-          <a
-            href="/setup.bat"
-            download="setup.bat"
-            className="inline-flex items-center gap-3 px-8 py-4 rounded-xl bg-electric-cyan text-obsidian font-extrabold text-base hover:bg-electric-cyan/90 transition-colors shadow-lg shadow-electric-cyan/20 group"
+          <button
+            onClick={handleDownloadClick}
+            className="inline-flex items-center gap-3 px-8 py-4 rounded-xl bg-electric-cyan text-obsidian font-extrabold text-base hover:bg-electric-cyan/90 transition-colors shadow-lg shadow-electric-cyan/20 group cursor-pointer"
           >
             Launch DIAD Setup Now
             <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-          </a>
+          </button>
         </motion.div>
+
+        {/* Pilot Registration & Consent Modal */}
+        <PilotRegistrationModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+        />
 
       </div>
     </div>
