@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import TrustCenter from "@/components/TrustCenter";
 import { motion } from "framer-motion";
 import {
   Terminal,
@@ -331,6 +332,9 @@ export default function DiadPage() {
             ))}
           </div>
         </div>
+
+        {/* Trust & Governance Center */}
+        <TrustCenter />
 
         {/* Embed Anywhere Callout */}
         <motion.div

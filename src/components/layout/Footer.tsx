@@ -4,7 +4,7 @@ export default function Footer() {
   return (
     <footer className="border-t border-[rgba(102,252,241,0.1)] glass mt-auto">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
           <div className="col-span-1 md:col-span-2">
             <Link href="/" className="flex items-center gap-2 mb-4">
               <div>
@@ -42,6 +42,17 @@ export default function Footer() {
               <li><Link href="/about" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">About Us</Link></li>
               <li><Link href="/contact" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">Contact</Link></li>
               <li><a href="https://play.d4e.ai" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">PartyGamesHub</a></li>
+            </ul>
+          </div>
+
+          <div>
+            <h3 className="text-white font-semibold mb-4 tracking-wider uppercase text-xs">Trust & Legal</h3>
+            <ul className="space-y-3">
+              <li><Link href="/diad/architecture" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">Architecture</Link></li>
+              <li><Link href="/diad/security" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">Security FAQ</Link></li>
+              <li><Link href="/diad/subprocessors" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">Subprocessors</Link></li>
+              <li><Link href="/terms" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">Terms & DPA</Link></li>
+              <li><Link href="/privacy" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">Privacy</Link></li>
             </ul>
           </div>
         </div>
