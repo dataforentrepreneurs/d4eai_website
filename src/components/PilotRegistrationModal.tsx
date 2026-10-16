@@ -1,21 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   X,
   ShieldCheck,
   Download,
-  Terminal,
   Check,
   Copy,
-  ArrowRight,
   Sparkles,
   Building2,
   Mail,
   User,
-  Globe
+  Globe,
+  UploadCloud,
+  ImageIcon
 } from "lucide-react";
 
 export interface RegistrationData {
@@ -23,7 +23,7 @@ export interface RegistrationData {
   brandName: string;
   workEmail: string;
   storeUrl: string;
-  storeTier: string;
+  logoDataUrl?: string;
 }
 
 interface PilotRegistrationModalProps {
@@ -41,13 +41,51 @@ export default function PilotRegistrationModal({
   const [brandName, setBrandName] = useState("");
   const [workEmail, setWorkEmail] = useState("");
   const [storeUrl, setStoreUrl] = useState("");
-  const [storeTier, setStoreTier] = useState("Growth");
+  const [logoDataUrl, setLogoDataUrl] = useState<string>("");
+  const [logoFileName, setLogoFileName] = useState<string>("");
   const [agreed, setAgreed] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
 
-  const psCommand = `irm https://raw.githubusercontent.com/dataforentrepreneurs/DIAD_Scaffold/main/setup.ps1 | iex`;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Generate dynamic tailored PowerShell command
+  const dynamicPsCommand = brandName.trim()
+    ? `$env:DIAD_BIZ="${brandName.trim()}"; $env:DIAD_URL="${storeUrl.trim()}"; irm https://raw.githubusercontent.com/dataforentrepreneurs/DIAD_Scaffold/main/setup.ps1 | iex`
+    : `irm https://raw.githubusercontent.com/dataforentrepreneurs/DIAD_Scaffold/main/setup.ps1 | iex`;
+
+  const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setErrorMsg("Please upload a valid image file (PNG, SVG, or JPG).");
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg("Logo image must be smaller than 5MB.");
+      return;
+    }
+
+    setLogoFileName(file.name);
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      setLogoDataUrl(result);
+      setErrorMsg("");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeLogo = () => {
+    setLogoDataUrl("");
+    setLogoFileName("");
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -56,7 +94,7 @@ export default function PilotRegistrationModal({
       return;
     }
     if (!agreed) {
-      setErrorMsg("Please accept the Free Community License and Pilot Logo Agreement.");
+      setErrorMsg("Please accept the Free Community License and Pilot Agreement.");
       return;
     }
 
@@ -66,25 +104,75 @@ export default function PilotRegistrationModal({
       brandName: brandName.trim(),
       workEmail: workEmail.trim(),
       storeUrl: storeUrl.trim(),
-      storeTier
+      logoDataUrl
     };
 
-    // Store consent & registration locally
+    // Store consent, registration, and logo locally
     try {
-      localStorage.setItem("diad_pilot_lead", JSON.stringify({
-        ...leadData,
-        registeredAt: new Date().toISOString(),
-        consentAccepted: true
-      }));
+      localStorage.setItem(
+        "diad_pilot_lead",
+        JSON.stringify({
+          ...leadData,
+          registeredAt: new Date().toISOString(),
+          consentAccepted: true
+        })
+      );
+      if (logoDataUrl) {
+        localStorage.setItem("diad_pilot_logo", logoDataUrl);
+      }
     } catch {}
 
-    // Trigger automatic download of setup.bat
+    // Generate dynamic setup.bat pre-filled with client's business details
+    const cleanBiz = brandName.replace(/["^&|<>]/g, "");
+    const cleanUrl = storeUrl.replace(/["^&|<>]/g, "");
+    const cleanEmail = workEmail.replace(/["^&|<>]/g, "");
+
+    const batContent = `@echo off
+title DIAD Onboarding Launcher
+echo ==============================================================
+echo        DIAD - AI Data Platform for Entrepreneurs             
+echo        One-Click Onboarding Launcher for ${cleanBiz}
+echo ==============================================================
+echo.
+
+:: 1. If running directly inside a DIAD project directory, launch immediately!
+if exist "scripts\\onboarding_dashboard.py" (
+    echo [INFO] Running from current DIAD directory: %CD%
+    powershell -ExecutionPolicy Bypass -File .\\setup.ps1 -BusinessName "${cleanBiz}" -WebsiteUrl "${cleanUrl}" -ContactEmail "${cleanEmail}"
+    if errorlevel 1 pause
+    exit /b
+)
+
+:: 2. Handle download if not present
+if not exist "%USERPROFILE%\\DIAD\\scripts\\onboarding_dashboard.py" goto do_download
+goto run_setup
+
+:do_download
+echo [INFO] Downloading latest DIAD release package from d4e.ai...
+powershell -ExecutionPolicy Bypass -Command "$ProgressPreference='SilentlyContinue'; [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12; Invoke-WebRequest -Uri 'https://d4e.ai/DIAD_release_v1.0.zip' -OutFile ($env:TEMP + '\\DIAD_release.zip'); Expand-Archive -Path ($env:TEMP + '\\DIAD_release.zip') -DestinationPath ($env:USERPROFILE + '\\DIAD') -Force; Remove-Item ($env:TEMP + '\\DIAD_release.zip') -Force; Write-Host '[SUCCESS] DIAD updated to latest release.' -ForegroundColor Green"
+
+:run_setup
+cd /d "%USERPROFILE%\\DIAD"
+
+echo.
+echo [INFO] Launching DIAD setup engine for ${cleanBiz}...
+powershell -ExecutionPolicy Bypass -File .\\setup.ps1 -BusinessName "${cleanBiz}" -WebsiteUrl "${cleanUrl}" -ContactEmail "${cleanEmail}"
+if errorlevel 1 (
+    echo.
+    echo [ERROR] Setup encountered an issue. See details above.
+    pause
+)
+`;
+
+    const blob = new Blob([batContent], { type: "application/x-msdos-program" });
+    const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = "/setup.bat";
+    link.href = blobUrl;
     link.download = "setup.bat";
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(blobUrl);
 
     setIsSubmitted(true);
     if (onSuccess) {
@@ -93,7 +181,7 @@ export default function PilotRegistrationModal({
   };
 
   const handleCopyCommand = () => {
-    navigator.clipboard.writeText(psCommand);
+    navigator.clipboard.writeText(dynamicPsCommand);
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
   };
@@ -123,7 +211,7 @@ export default function PilotRegistrationModal({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
           transition={{ duration: 0.25 }}
-          className="relative w-full max-w-xl glass-card border border-electric-cyan/40 bg-obsidian/95 shadow-2xl p-6 sm:p-8 rounded-2xl z-10 text-white my-8"
+          className="relative w-full max-w-xl glass-card border border-electric-cyan/40 bg-obsidian/95 shadow-2xl p-6 sm:p-8 rounded-2xl z-10 text-white my-8 max-h-[90vh] overflow-y-auto"
         >
           {/* Close button */}
           <button
@@ -146,7 +234,7 @@ export default function PilotRegistrationModal({
                   Activate Your Free DIAD License
                 </h3>
                 <p className="text-gray-300 text-xs sm:text-sm leading-relaxed">
-                  DIAD is 100% free (S$0 software licensing fee) and runs completely inside your own Google Cloud account. Please confirm your brand details below to unlock your setup package.
+                  DIAD is 100% free (S$0 software licensing fee) and runs completely inside your own Google Cloud account. Please confirm your details below to unlock your personalized setup kit.
                 </p>
               </div>
 
@@ -222,19 +310,63 @@ export default function PilotRegistrationModal({
                   </div>
                 </div>
 
+                {/* Company Logo Upload */}
                 <div>
-                  <label className="block text-xs font-medium text-gray-300 mb-1">
-                    Monthly Order Volume (for recommended cloud budget)
+                  <label className="block text-xs font-medium text-gray-300 mb-1 flex items-center gap-1.5">
+                    <ImageIcon className="w-3.5 h-3.5 text-electric-cyan" />
+                    Company Logo (PNG, SVG, or JPG)
+                    <span className="text-gray-500 font-normal">(Recommended)</span>
                   </label>
-                  <select
-                    value={storeTier}
-                    onChange={(e) => setStoreTier(e.target.value)}
-                    className="w-full px-3.5 py-2.5 rounded-xl bg-slate/40 border border-slate focus:border-electric-cyan focus:outline-none text-sm text-white"
-                  >
-                    <option value="Boutique" className="bg-obsidian text-white">Boutique (&lt; 1,000 orders/mo • ~S$25-S$35 cloud bill)</option>
-                    <option value="Growth" className="bg-obsidian text-white">Growth Retail (1,000 – 10,000 orders/mo • ~S$50-S$80 cloud bill)</option>
-                    <option value="Scaling" className="bg-obsidian text-white">Scaling Omnichannel (10,000+ orders/mo • ~S$100-S$150 cloud bill)</option>
-                  </select>
+
+                  {!logoDataUrl ? (
+                    <div
+                      onClick={() => fileInputRef.current?.click()}
+                      className="border border-dashed border-slate hover:border-electric-cyan/60 rounded-xl p-3.5 text-center cursor-pointer bg-slate/20 hover:bg-slate/30 transition-colors flex items-center justify-center gap-3"
+                    >
+                      <UploadCloud className="w-5 h-5 text-electric-cyan" />
+                      <div className="text-left">
+                        <p className="text-xs font-medium text-gray-200">
+                          Click to upload your brand logo
+                        </p>
+                        <p className="text-[0.7rem] text-gray-400">
+                          Used to personalize your chatbots & feature your store as a partner
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate/40 border border-electric-cyan/40">
+                      <div className="flex items-center gap-3">
+                        <img
+                          src={logoDataUrl}
+                          alt="Brand Logo"
+                          className="w-10 h-10 object-contain rounded-lg bg-obsidian p-1 border border-slate"
+                        />
+                        <div>
+                          <p className="text-xs font-medium text-white truncate max-w-[200px]">
+                            {logoFileName || "Brand Logo"}
+                          </p>
+                          <span className="text-[0.65rem] text-emerald-400 font-mono">
+                            ✓ Logo ready
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={removeLogo}
+                        className="text-xs text-rose-400 hover:text-rose-300 p-1.5 hover:bg-rose-500/10 rounded-lg transition-colors"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/png,image/svg+xml,image/jpeg,image/webp"
+                    onChange={handleLogoUpload}
+                    className="hidden"
+                  />
                 </div>
 
                 {/* Consent Checkbox */}
@@ -253,7 +385,7 @@ export default function PilotRegistrationModal({
                       </Link>{" "}
                       and{" "}
                       <Link href="/diad/privacy" target="_blank" className="text-electric-cyan underline hover:text-white">
-                        Zero-Telemetry Privacy Policy
+                        Privacy Policy
                       </Link>
                       . In exchange for free self-hosted platform access, I grant Data for Entrepreneurs permission to display our brand name and logo on d4e.ai as an early pilot partner.
                     </span>
@@ -285,7 +417,7 @@ export default function PilotRegistrationModal({
                 Setup Kit Ready for {brandName}!
               </h3>
               <p className="text-gray-300 text-xs sm:text-sm max-w-md mx-auto mb-6 leading-relaxed">
-                Your download of <code className="text-electric-cyan font-mono">setup.bat</code> has started. Follow the steps below to launch your onboarding suite.
+                Your personalized <code className="text-electric-cyan font-mono">setup.bat</code> has been downloaded. Follow the 3 steps below to launch your onboarding suite.
               </p>
 
               {/* Onboarding Instructions */}
@@ -300,7 +432,7 @@ export default function PilotRegistrationModal({
                 </div>
                 <div className="flex items-start gap-2.5 text-xs text-gray-300">
                   <span className="w-5 h-5 rounded-full bg-electric-cyan/20 text-electric-cyan flex items-center justify-center font-bold flex-shrink-0 text-[0.7rem]">3</span>
-                  <span>Link your Google Cloud project and connect your store data with 1-click guided prompts.</span>
+                  <span>Your business name is automatically prefilled. Upload your GCP Service Account key to connect your pipeline!</span>
                 </div>
               </div>
 
@@ -309,7 +441,7 @@ export default function PilotRegistrationModal({
                 <p className="text-xs text-gray-400 mb-2 font-mono text-left">Or paste directly into PowerShell:</p>
                 <div className="bg-obsidian border border-slate rounded-xl p-3 flex items-center justify-between gap-3 text-left">
                   <code className="text-electric-cyan font-mono text-xs break-all">
-                    {psCommand}
+                    {dynamicPsCommand}
                   </code>
                   <button
                     onClick={handleCopyCommand}
@@ -322,17 +454,16 @@ export default function PilotRegistrationModal({
               </div>
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-                <a
-                  href="/setup.bat"
-                  download="setup.bat"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate hover:bg-slate/80 text-white text-xs font-semibold transition-colors"
+                <button
+                  onClick={handleSubmit}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate hover:bg-slate/80 text-white text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
                   Download Again
-                </a>
+                </button>
                 <button
                   onClick={handleReset}
-                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-electric-cyan text-obsidian font-bold text-xs hover:bg-electric-cyan/90 transition-colors"
+                  className="w-full sm:w-auto px-6 py-2.5 rounded-xl bg-electric-cyan text-obsidian font-bold text-xs hover:bg-electric-cyan/90 transition-colors cursor-pointer"
                 >
                   Done
                 </button>
