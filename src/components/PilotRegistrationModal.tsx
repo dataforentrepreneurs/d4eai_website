@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -49,6 +49,26 @@ export default function PilotRegistrationModal({
   const [errorMsg, setErrorMsg] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-populate from saved credentials if available, while ensuring user can review/edit
+  useEffect(() => {
+    if (isOpen) {
+      try {
+        const saved = JSON.parse(localStorage.getItem("diad_pilot_lead") || "{}");
+        if (saved.fullName) setFullName(saved.fullName);
+        if (saved.brandName) setBrandName(saved.brandName);
+        if (saved.workEmail) setWorkEmail(saved.workEmail);
+        if (saved.storeUrl) setStoreUrl(saved.storeUrl);
+        const savedLogo = localStorage.getItem("diad_pilot_logo");
+        if (savedLogo) {
+          setLogoDataUrl(savedLogo);
+          setLogoFileName("Uploaded Brand Logo");
+        }
+      } catch (err) {
+        console.warn("Could not read saved lead from localStorage", err);
+      }
+    }
+  }, [isOpen]);
 
   // Generate dynamic tailored PowerShell command
   const dynamicPsCommand = brandName.trim()

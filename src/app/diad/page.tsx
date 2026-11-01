@@ -29,22 +29,22 @@ export default function DiadPage() {
   const [activeTab, setActiveTab] = useState<"customer" | "internal">("customer");
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  // Cloud Cost Calculator State
+  const [calcOrders, setCalcOrders] = useState(2500);
+  const [calcQueries, setCalcQueries] = useState(150);
+  const [calcDocs, setCalcDocs] = useState(35);
+
+  const costCloudRun = (calcQueries * 30 > 2000000) ? ((calcQueries * 30 - 2000000) * 0.0000004).toFixed(2) : "0.00";
+  const costBq = (0.50 + (calcOrders * 0.0011)).toFixed(2);
+  const costSecrets = "0.45";
+  const costAi = ((calcQueries * 30 * 0.002) + (calcDocs * 0.02)).toFixed(2);
+  const totalCost = (parseFloat(costCloudRun) + parseFloat(costBq) + parseFloat(costSecrets) + parseFloat(costAi)).toFixed(2);
+
   const psCommand = `irm https://raw.githubusercontent.com/dataforentrepreneurs/DIAD_Scaffold/main/setup.ps1 | iex`;
 
   const handleDownloadClick = (e?: React.MouseEvent) => {
     if (e) e.preventDefault();
-    try {
-      const existingLead = localStorage.getItem("diad_pilot_lead");
-      if (existingLead) {
-        const link = document.createElement("a");
-        link.href = "/setup.bat";
-        link.download = "setup.bat";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        return;
-      }
-    } catch {}
+    // Always open modal so credentials & license terms can be reviewed or edited
     setIsModalOpen(true);
   };
 
@@ -208,6 +208,143 @@ export default function DiadPage() {
             <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> No coding required</span>
             <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> Pre-built Cloud Run containers</span>
             <span className="flex items-center gap-1.5"><CheckCircle2 className="w-4 h-4 text-emerald-400" /> 100% private to your GCP</span>
+          </div>
+        </motion.div>
+
+        {/* Self-Hosted Cloud Operating Cost Calculator */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.6 }}
+          className="glass-card p-6 sm:p-10 max-w-4xl mx-auto mb-20 border-electric-cyan/30 relative overflow-hidden shadow-2xl"
+        >
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+            <div>
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-electric-cyan/10 border border-electric-cyan/30 text-electric-cyan text-xs font-mono uppercase tracking-wider mb-2">
+                💰 Cloud Cost Transparency
+              </span>
+              <h2 className="text-xl sm:text-2xl font-bold text-white">Self-Hosted Cloud Operating Cost Calculator</h2>
+              <p className="text-xs sm:text-sm text-gray-300 mt-1">
+                Calculate your estimated monthly Google Cloud bill. 100% billed directly to GCP with <strong className="text-white">zero vendor markup</strong>.
+              </p>
+            </div>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-xs font-semibold flex-shrink-0">
+              ⚡ GCP Free Tier: 2M req/mo & 10GB BQ Included
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 mb-6">
+            {/* Sliders Column */}
+            <div className="lg:col-span-7 space-y-6">
+              {/* Slider 1: Monthly Orders */}
+              <div>
+                <div className="flex justify-between text-xs sm:text-sm font-medium text-gray-200 mb-2">
+                  <span>Monthly Store Order Volume:</span>
+                  <span className="text-electric-cyan font-mono font-bold">{calcOrders.toLocaleString()} orders/mo</span>
+                </div>
+                <input
+                  type="range"
+                  min="100"
+                  max="25000"
+                  step="100"
+                  value={calcOrders}
+                  onChange={(e) => setCalcOrders(parseInt(e.target.value))}
+                  className="w-full accent-electric-cyan h-2 bg-slate/60 rounded-lg cursor-pointer"
+                />
+                <div className="flex justify-between text-[0.7rem] text-gray-500 mt-1">
+                  <span>100</span>
+                  <span>10,000</span>
+                  <span>25,000+</span>
+                </div>
+              </div>
+
+              {/* Slider 2: Daily AI Queries */}
+              <div>
+                <div className="flex justify-between text-xs sm:text-sm font-medium text-gray-200 mb-2">
+                  <span>Daily AI Inquiries (Customer + Staff BI):</span>
+                  <span className="text-electric-cyan font-mono font-bold">{calcQueries.toLocaleString()} queries/day</span>
+                </div>
+                <input
+                  type="range"
+                  min="10"
+                  max="3000"
+                  step="10"
+                  value={calcQueries}
+                  onChange={(e) => setCalcQueries(parseInt(e.target.value))}
+                  className="w-full accent-electric-cyan h-2 bg-slate/60 rounded-lg cursor-pointer"
+                />
+                <div className="flex justify-between text-[0.7rem] text-gray-500 mt-1">
+                  <span>10/day</span>
+                  <span>1,000/day</span>
+                  <span>3,000+/day</span>
+                </div>
+              </div>
+
+              {/* Slider 3: Knowledge Base Docs */}
+              <div>
+                <div className="flex justify-between text-xs sm:text-sm font-medium text-gray-200 mb-2">
+                  <span>Knowledge Base Documents (Drive / Notion / Confluence):</span>
+                  <span className="text-electric-cyan font-mono font-bold">{calcDocs} documents</span>
+                </div>
+                <input
+                  type="range"
+                  min="5"
+                  max="300"
+                  step="5"
+                  value={calcDocs}
+                  onChange={(e) => setCalcDocs(parseInt(e.target.value))}
+                  className="w-full accent-electric-cyan h-2 bg-slate/60 rounded-lg cursor-pointer"
+                />
+                <div className="flex justify-between text-[0.7rem] text-gray-500 mt-1">
+                  <span>5 docs</span>
+                  <span>100 docs</span>
+                  <span>300+ docs</span>
+                </div>
+              </div>
+
+              {/* Incremental GDrive Sync Note */}
+              <div className="p-3.5 rounded-xl bg-electric-cyan/5 border border-electric-cyan/20 text-xs text-gray-300 leading-relaxed flex items-start gap-3">
+                <span className="text-base flex-shrink-0">🔄</span>
+                <div>
+                  <strong className="text-electric-cyan">Zero-Waste Incremental Sync Active:</strong> Google Drive is pulled <strong>only when changes are made</strong>. DIAD verifies document SHA-256 hashes and <code className="text-electric-cyan font-mono">modifiedTime</code> timestamps. Unchanged files are never re-vectorized or billed twice.
+                </div>
+              </div>
+            </div>
+
+            {/* Results Column */}
+            <div className="lg:col-span-5 bg-obsidian/90 border border-slate/60 rounded-xl p-5 flex flex-col justify-between shadow-inner">
+              <div>
+                <div className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">
+                  Estimated Monthly Infrastructure Bill
+                </div>
+                <div className="space-y-3 text-xs sm:text-sm">
+                  <div className="flex justify-between text-gray-300">
+                    <span>Google Cloud Run:</span>
+                    <span className="font-mono text-white">S$ {costCloudRun} (Free Tier)</span>
+                  </div>
+                  <div className="flex justify-between text-gray-300">
+                    <span>BigQuery Data Warehouse:</span>
+                    <span className="font-mono text-white">S$ {costBq}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-300">
+                    <span>Secret Manager & Schedulers:</span>
+                    <span className="font-mono text-white">S$ {costSecrets}</span>
+                  </div>
+                  <div className="flex justify-between text-gray-300">
+                    <span>Vector Search & AI Inference:</span>
+                    <span className="font-mono text-white">S$ {costAi}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="border-t border-slate/80 pt-4 mt-6 flex justify-between items-baseline">
+                <span className="text-xs text-gray-400 uppercase tracking-wider">Total Estimated GCP:</span>
+                <span className="text-2xl font-extrabold text-electric-cyan font-mono">
+                  ~S$ {totalCost} <span className="text-xs text-gray-400 font-normal">/mo</span>
+                </span>
+              </div>
+            </div>
           </div>
         </motion.div>
 
