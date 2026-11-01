@@ -163,8 +163,10 @@ if exist "scripts\\onboarding_dashboard.py" (
     exit /b
 )
 
-:: 2. Handle download if not present
+:: 2. Handle download or auto-upgrade if older release is cached
 if not exist "%USERPROFILE%\\DIAD\\scripts\\onboarding_dashboard.py" goto do_download
+findstr /c:"v1.0.5" "%USERPROFILE%\\DIAD\\scripts\\onboarding_dashboard.py" >nul 2>&1
+if errorlevel 1 goto do_download
 goto run_setup
 
 :do_download

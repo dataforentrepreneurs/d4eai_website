@@ -535,6 +535,14 @@ export default function DiadPage() {
           onClose={() => setIsModalOpen(false)}
         />
 
+        {/* Version & Build Timestamp Footer Badge */}
+        <div className="mt-16 pt-6 border-t border-slate/50 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs font-mono text-gray-400">
+          <span>DIAD Self-Hosted AI Data Platform • Zero-Custody Edition</span>
+          <span className="text-electric-cyan font-semibold">
+            🟢 Latest Push Active: v1.0.5 • Build: 2026-11-02 01:42 SGT (UTC+8)
+          </span>
+        </div>
+
       </div>
     </div>
   );
