@@ -23,18 +23,6 @@ import {
 export default function TrustCenter() {
   const [activeTab, setActiveTab] = useState<"architecture" | "security" | "subprocessors" | "legal">("architecture");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [ordersPerMo, setOrdersPerMo] = useState<number>(2500);
-  const [queriesPerDay, setQueriesPerDay] = useState<number>(150);
-  const [docsCount, setDocsCount] = useState<number>(35);
-
-  const monthlyRequests = queriesPerDay * 30 + ordersPerMo * 4;
-  const cloudRunCost = monthlyRequests > 2000000 ? ((monthlyRequests - 2000000) / 1000000) * 0.4 : 0;
-  const storageGb = ordersPerMo * 0.0002 + docsCount * 0.001;
-  const queryTb = queriesPerDay * 30 * 0.0005;
-  const bqTotal = 2.2 + Math.max(0, storageGb - 10) * 0.026 + Math.max(0, queryTb - 1.0) * 6.75;
-  const secretsCost = 0.45;
-  const aiTotal = Math.max(2.5, docsCount * 0.05 * 0.0001 + queriesPerDay * 30 * 0.0022);
-  const totalEstimatedGcp = cloudRunCost + bqTotal + secretsCost + aiTotal;
 
   const toggleFaq = (idx: number) => {
     setOpenFaq(openFaq === idx ? null : idx);
@@ -163,7 +151,7 @@ export default function TrustCenter() {
             }`}
           >
             <Layers className="w-4 h-4" />
-            Architecture & Cloud Costs
+            Zero-Custody Architecture
           </button>
 
           <button
@@ -293,101 +281,6 @@ export default function TrustCenter() {
                         <span>Contractual Zero Data Retention (ZDR) guarantee.</span>
                       </li>
                     </ul>
-                  </div>
-                </div>
-
-                {/* Interactive Cloud Cost Transparency Calculator */}
-                <div className="bg-obsidian/80 border border-electric-cyan/30 rounded-2xl p-6 mb-8">
-                  <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                    <h4 className="text-lg font-bold text-white flex items-center gap-2">
-                      <DollarSign className="w-5 h-5 text-electric-cyan" />
-                      💰 Cloud Cost Transparency Calculator
-                    </h4>
-                    <span className="text-xs font-mono font-semibold text-electric-cyan bg-electric-cyan/10 border border-electric-cyan/30 px-3 py-1 rounded-full">
-                      ⚡ GCP Free Tier: 2M req/mo & 10GB BQ Included
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-300 mb-6">
-                    Estimate your sovereign Google Cloud infrastructure bills based on your store&apos;s data size and query volume. 100% direct billing to GCP with zero vendor markup.
-                  </p>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex justify-between text-xs text-gray-200 mb-1.5">
-                          <span>Monthly Orders:</span>
-                          <strong className="text-electric-cyan font-mono">{ordersPerMo.toLocaleString()} orders/mo</strong>
-                        </div>
-                        <input
-                          type="range"
-                          min={100}
-                          max={25000}
-                          step={100}
-                          value={ordersPerMo}
-                          onChange={(e) => setOrdersPerMo(Number(e.target.value))}
-                          className="w-full accent-electric-cyan cursor-pointer"
-                        />
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between text-xs text-gray-200 mb-1.5">
-                          <span>Daily AI Queries (Customer + Staff):</span>
-                          <strong className="text-electric-cyan font-mono">{queriesPerDay.toLocaleString()} queries/day</strong>
-                        </div>
-                        <input
-                          type="range"
-                          min={10}
-                          max={3000}
-                          step={10}
-                          value={queriesPerDay}
-                          onChange={(e) => setQueriesPerDay(Number(e.target.value))}
-                          className="w-full accent-electric-cyan cursor-pointer"
-                        />
-                      </div>
-
-                      <div>
-                        <div className="flex justify-between text-xs text-gray-200 mb-1.5">
-                          <span>Google Drive Knowledge Docs:</span>
-                          <strong className="text-electric-cyan font-mono">{docsCount.toLocaleString()} documents</strong>
-                        </div>
-                        <input
-                          type="range"
-                          min={5}
-                          max={300}
-                          step={5}
-                          value={docsCount}
-                          onChange={(e) => setDocsCount(Number(e.target.value))}
-                          className="w-full accent-electric-cyan cursor-pointer"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="bg-slate/60 border border-slate rounded-xl p-5 flex flex-col justify-between space-y-2.5 text-xs">
-                      <div className="flex justify-between text-gray-300">
-                        <span>Cloud Run:</span>
-                        <span className="text-white font-mono">
-                          {cloudRunCost === 0 ? "S$ 0.00 (Free Tier)" : `S$ ${cloudRunCost.toFixed(2)}`}
-                        </span>
-                      </div>
-                      <div className="flex justify-between text-gray-300">
-                        <span>BigQuery Marts:</span>
-                        <span className="text-white font-mono">S$ {bqTotal.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-gray-300">
-                        <span>Secrets & Crons:</span>
-                        <span className="text-white font-mono">S$ {secretsCost.toFixed(2)}</span>
-                      </div>
-                      <div className="flex justify-between text-gray-300">
-                        <span>AI Token Inference:</span>
-                        <span className="text-white font-mono">S$ {aiTotal.toFixed(2)}</span>
-                      </div>
-                      <div className="border-t border-electric-cyan/30 pt-3 mt-2 flex justify-between items-baseline">
-                        <span className="text-gray-300 font-semibold">Total Estimated GCP:</span>
-                        <strong className="text-xl text-electric-cyan font-mono font-extrabold">
-                          ~S$ {totalEstimatedGcp.toFixed(2)} /mo
-                        </strong>
-                      </div>
-                    </div>
                   </div>
                 </div>
               </motion.div>
