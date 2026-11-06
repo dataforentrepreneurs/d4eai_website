@@ -1,9 +1,10 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
-import { Menu, X, Rocket, Gamepad2 } from "lucide-react";
+import { Menu, X, Gamepad2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 const navLinks = [
@@ -24,13 +25,19 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-20">
           <div className="flex-shrink-0 flex items-center">
-            <Link href="/" className="flex items-center gap-2 group">
-              <div className="p-2 bg-electric-cyan/10 rounded-lg group-hover:bg-electric-cyan/20 transition-colors">
-                <Rocket className="text-electric-cyan w-6 h-6" />
+            <Link href="/" className="flex items-center gap-3 group">
+              <div className="relative w-10 h-10 rounded-xl overflow-hidden glass border border-electric-cyan/30 p-1 flex items-center justify-center group-hover:border-electric-cyan transition-colors bg-obsidian/60 shadow-[0_0_15px_rgba(102,252,241,0.2)]">
+                <Image
+                  src="/images/d4e_logo.png"
+                  alt="Data for Entrepreneurs Logo"
+                  width={36}
+                  height={36}
+                  className="object-contain"
+                />
               </div>
               <div>
-                <span className="font-bold text-xl tracking-tight text-white block">d4e.ai</span>
-                <span className="text-[0.65rem] text-electric-cyan-dim font-mono tracking-widest uppercase block -mt-1">Data for Everyone</span>
+                <span className="font-bold text-xl tracking-tight text-white block group-hover:text-electric-cyan transition-colors">d4e.ai</span>
+                <span className="text-[0.65rem] text-electric-cyan font-mono tracking-widest uppercase block -mt-0.5">Data for Entrepreneurs</span>
               </div>
             </Link>
           </div>
