@@ -32,7 +32,7 @@ export default function Footer() {
             <ul className="space-y-3">
               <li><Link href="/" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">Home</Link></li>
               <li><Link href="/diad" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">DIAD Platform</Link></li>
-              <li><Link href="/play" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">Play (Games Hub)</Link></li>
+              <li><Link href="/play" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">AI Games Lab</Link></li>
               <li><Link href="/resources" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">Resources & Books</Link></li>
             </ul>
           </div>
@@ -42,7 +42,7 @@ export default function Footer() {
             <ul className="space-y-3">
               <li><Link href="/about" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">About Us</Link></li>
               <li><Link href="/contact" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">Contact</Link></li>
-              <li><a href="https://play.d4e.ai" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">PartyGamesHub</a></li>
+              <li><a href="https://play.d4e.ai" target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-electric-cyan text-sm transition-colors">play.d4e.ai (Live Demo)</a></li>
             </ul>
           </div>
         </div>

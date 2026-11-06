@@ -17,6 +17,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Data for Entrepreneurs | Agentic Data Intelligence",
   description: "Empowering startups with data strategies that scale. High-end agentic AI platform, data pipelines, and intelligent chatbots.",
+  icons: {
+    icon: "/favicon.ico",
+  },
 };
 
 export default function RootLayout({

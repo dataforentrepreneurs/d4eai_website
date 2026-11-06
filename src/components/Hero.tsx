@@ -135,21 +135,12 @@ export default function Hero() {
 
           <Link
             href="/resources"
-            className="flex items-center gap-2 px-7 py-3.5 rounded-xl glass border border-electric-cyan/30 text-white font-semibold text-base hover:bg-electric-cyan/10 hover:border-electric-cyan transition-all"
+            className="flex items-center gap-2 px-7 py-3.5 rounded-xl glass border border-white/20 text-white font-semibold text-base hover:bg-white/10 hover:border-white/40 transition-all"
           >
             <BookOpen className="w-5 h-5 text-electric-cyan" />
             Founder Books & Video
             <ArrowRight className="w-4 h-4 ml-1" />
           </Link>
-
-          <a
-            href="https://play.d4e.ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-6 py-3.5 rounded-xl glass border border-neon-purple/40 text-neon-purple font-medium text-sm hover:bg-neon-purple/10 transition-colors"
-          >
-            <Gamepad2 className="w-4 h-4" /> Party Games Hub
-          </a>
         </motion.div>
 
         {/* BRAND VIDEO SHOWCASE (LOADS & AUTOPLAYS ON MOUNT) */}

@@ -1,16 +1,16 @@
 @import "tailwindcss";
 
 :root {
-  --background: #050014;
-  --foreground: #FFFFFF;
+  --background: #070913;
+  --foreground: #F8FAFC;
   
-  --color-obsidian: #050014;
-  --color-slate: #110B29;
-  --color-cyan: #66FCF1;
-  --color-cyan-dim: #45A29E;
-  --color-violet: #8A2BE2;
-  --color-violet-light: #A05BEE;
-  --color-neon-purple: #B200FF;
+  --color-obsidian: #070913;
+  --color-slate: #0F172A;
+  --color-cyan: #38BDF8;
+  --color-cyan-dim: #0284C7;
+  --color-violet: #6366F1;
+  --color-violet-light: #818CF8;
+  --color-neon-purple: #4F46E5;
 }
 
 @theme inline {
@@ -24,33 +24,33 @@
   --color-electric-violet-light: var(--color-violet-light);
   --color-neon-purple: var(--color-neon-purple);
   
-  --font-sans: var(--font-geist-sans), Inter, sans-serif;
+  --font-sans: var(--font-geist-sans), Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: var(--font-geist-mono), monospace;
 }
 
-/* Glassmorphism Utilities */
+/* Professional Enterprise Glass Utilities */
 @utility glass {
-  background: rgba(17, 11, 41, 0.4);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  border: 1px solid rgba(138, 43, 226, 0.2);
-  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.5);
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4);
 }
 
 @utility glass-card {
-  background: rgba(17, 11, 41, 0.6);
+  background: rgba(15, 23, 42, 0.7);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(138, 43, 226, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 1rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
-  transition: all 0.3s ease-in-out;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.5);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @utility glass-card-hover {
-  border-color: rgba(178, 0, 255, 0.6);
-  box-shadow: 0 8px 32px rgba(178, 0, 255, 0.2);
-  transform: translateY(-4px);
+  border-color: rgba(56, 189, 248, 0.25);
+  box-shadow: 0 12px 36px -6px rgba(0, 0, 0, 0.7), 0 0 16px -2px rgba(56, 189, 248, 0.12);
+  transform: translateY(-2px);
 }
 
 body {
@@ -66,21 +66,21 @@ html {
 
 /* Custom Selection */
 ::selection {
-  background: var(--color-neon-purple);
-  color: var(--color-foreground);
+  background: rgba(56, 189, 248, 0.3);
+  color: #FFFFFF;
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
 }
 ::-webkit-scrollbar-track {
   background: var(--color-obsidian);
 }
 ::-webkit-scrollbar-thumb {
-  background: var(--color-slate);
+  background: #1E293B;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-cyan-dim);
+  background: #334155;
 }
