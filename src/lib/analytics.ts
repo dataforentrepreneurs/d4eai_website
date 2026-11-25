@@ -2,7 +2,7 @@ export const GA_MEASUREMENT_ID =
   process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || "G-X4DDFJ95FQ";
 
 export const CLARITY_PROJECT_ID =
-  process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID || "";
+  process.env.NEXT_PUBLIC_CLARITY_PROJECT_ID || "zj4jinms23";
 
 export const TELEMETRY_ENDPOINT =
   process.env.NEXT_PUBLIC_TELEMETRY_ENDPOINT || "/api/track";
