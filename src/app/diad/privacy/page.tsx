@@ -55,7 +55,7 @@ export default function DiadPrivacyPage() {
           <div className="p-5 rounded-xl bg-obsidian border border-electric-cyan/20">
             <h2 className="text-lg font-bold text-electric-cyan mb-2">2. What We Guarantee We Never Collect</h2>
             <ul className="space-y-2 text-xs text-gray-200">
-              <li>✔ <strong>Zero Runtime Telemetry in Deployed DIAD Production Services:</strong> Deployed Cloud Run containers and BigQuery warehouses contain zero hidden diagnostic beacons or phone-home calls back to D4E. The local Setup Wizard (<code>localhost:8000</code>) includes only an optional, 1-click toggleable stage-timing metric (tab/step durations) with zero business data, credentials, filenames, or queries.</li>
+              <li>✔ <strong>Zero Runtime Telemetry in Deployed DIAD Production Services:</strong> Deployed Cloud Run containers and BigQuery warehouses contain zero hidden diagnostic beacons or phone-home calls back to D4E. The local Setup Wizard (<code>localhost:8000</code>) records only anonymous setup stage-timing diagnostics (tab/step durations, disableable via <code>DIAD_NO_TELEMETRY=1</code>) with zero business data, credentials, filenames, or queries.</li>
               <li>✔ <strong>Zero Transactional Mirroring:</strong> We do not log, capture, or store your order history, sales volume, customer addresses, or revenue data.</li>
               <li>✔ <strong>Zero Training on Customer Data:</strong> We never use your business documents, policies, or customer conversations to train public foundation models.</li>
               <li>✔ <strong>Zero Data Brokering:</strong> Your business intelligence is never sold, shared, or brokered to advertisers or market research firms.</li>
@@ -86,10 +86,10 @@ export default function DiadPrivacyPage() {
           <div>
             <h2 className="text-lg font-bold text-white mb-2">6. Website Analytics, Setup Timing &amp; Pilot Registration on d4e.ai</h2>
             <p className="mb-2">
-              While deployed <strong>DIAD production services</strong> (Cloud Run &amp; BigQuery) in your Google Cloud account strictly maintain zero telemetry and zero phone-home behavior, our public marketing website (<code>d4e.ai</code>) uses Google Analytics 4 and first-party engagement metrics (page views, scroll depth, active time, video playback, and button clicks) to understand which documentation and demos are most helpful.
+              While deployed <strong>DIAD production services</strong> (Cloud Run &amp; BigQuery) in your Google Cloud account strictly maintain zero telemetry and zero phone-home behavior, our public marketing website (<code>d4e.ai</code>) uses Google Analytics 4, Microsoft Clarity (with Balanced input masking), and first-party engagement metrics (page views, scroll depth, active time, video playback, and button clicks) to understand which documentation and demos are most helpful.
             </p>
             <p className="mb-2">
-              The local <strong>DIAD Onboarding Setup Wizard</strong> (<code>localhost:8000</code>) also includes a visible <strong>Setup Metrics</strong> toggle in the header so you can opt in or opt out with 1 click; when enabled, it records only anonymous tab/step durations and completion milestones—never your business name, GCP project ID, API keys, service account files, uploaded filenames, or chatbot queries.
+              The local <strong>DIAD Onboarding Setup Wizard</strong> (<code>localhost:8000</code>) also records anonymous stage-timing diagnostics (tab/step durations and completion milestones—never your business name, GCP project ID, API keys, service account files, uploaded filenames, or chatbot queries) to help improve onboarding speed; teams can disable it anytime by setting <code>DIAD_NO_TELEMETRY=1</code> before launching the wizard.
             </p>
             <p>
               When you voluntarily submit the <strong>DIAD Free Pilot Activation</strong> or Contact form on <code>d4e.ai</code>, the profile information you enter (name, brand name, work email, storefront URL, and optional company logo) is transmitted to Data for Entrepreneurs solely to provision your community license, contact you regarding pilot support, and display your brand logo if consented.

@@ -47,7 +47,7 @@ export default function TrustCenter() {
     },
     {
       q: "Does DIAD copy, mirror, or store our transactional records on D4E servers?",
-      a: "Never. DIAD operates on a strict Zero-Custody Architecture. Deployed Cloud Run and BigQuery services maintain zero centralized databases, zero analytical telemetry sinks, and zero external mirrors. (Only the local Setup Wizard includes an optional, 1-click toggleable anonymous stage-timing metric with zero business data or credentials.)"
+      a: "Never. DIAD operates on a strict Zero-Custody Architecture. Deployed Cloud Run and BigQuery services maintain zero centralized databases, zero analytical telemetry sinks, and zero external mirrors. (Only the local Setup Wizard sends anonymous stage-timing diagnostics with zero business data or credentials, disableable via DIAD_NO_TELEMETRY=1.)"
     },
     {
       q: "Who owns the cloud infrastructure, IAM permissions, and encryption keys?",
