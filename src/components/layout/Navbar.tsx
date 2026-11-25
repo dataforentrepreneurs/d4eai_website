@@ -74,6 +74,8 @@ export default function Navbar() {
 
             <Link
               href="/diad"
+              data-track-cta="navbar_launch_diad"
+              data-track-cta-location="navbar_desktop"
               className="flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-lg bg-electric-cyan text-obsidian hover:bg-white transition-all shadow-[0_0_15px_rgba(56,189,248,0.25)]"
             >
               Launch DIAD <ArrowUpRight className="w-3.5 h-3.5" />
@@ -117,6 +119,8 @@ export default function Navbar() {
             <div className="pt-2">
               <Link
                 href="/diad"
+                data-track-cta="navbar_launch_diad"
+                data-track-cta-location="navbar_mobile"
                 onClick={() => setIsOpen(false)}
                 className="flex items-center justify-center gap-1.5 w-full py-2.5 rounded-lg bg-electric-cyan text-obsidian font-bold text-sm"
               >

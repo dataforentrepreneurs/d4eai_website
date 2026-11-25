@@ -1,8 +1,14 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
+import {
+  addVideoWatchSeconds,
+  setVideoPlayingState,
+  trackEvent,
+  type YTPlayer,
+} from "@/lib/analytics";
 import {
   BookOpen,
   Video,
@@ -57,24 +63,235 @@ const chapters: Chapter[] = [
   { time: 1267, timeStr: "21:07", title: "(Chapter 5) Wrap-Up & Roadmap", category: "Chapter 5" },
 ];
 
+const YOUTUBE_MILESTONES = [10, 25, 50, 75, 90, 100] as const;
+
 export default function ResourcesPage() {
   const [selectedFilter, setSelectedFilter] = useState<"all" | "video" | "book1" | "book2">("all");
   const [activeChapter, setActiveChapter] = useState<Chapter>(chapters[0]);
   const [isToc1Open, setIsToc1Open] = useState(false);
   const [isToc2Open, setIsToc2Open] = useState(false);
 
-  const videoSrc = `https://www.youtube.com/embed/NofI0hwgRxc?enablejsapi=1&start=${activeChapter.time}&autoplay=1`;
+  const showVideo = selectedFilter === "all" || selectedFilter === "video";
+  const videoSrc =
+    "https://www.youtube.com/embed/NofI0hwgRxc?enablejsapi=1&rel=0";
+
+  const playerRef = useRef<YTPlayer | null>(null);
+  const playerReadyRef = useRef<boolean>(false);
+  const pendingSeekRef = useRef<number | null>(null);
+  const ytStartedRef = useRef<boolean>(false);
+  const ytMilestonesRef = useRef<Set<number>>(new Set());
+  const ytPollRef = useRef<number | null>(null);
+  const activeChapterRef = useRef<Chapter>(chapters[0]);
+
+  useEffect(() => {
+    activeChapterRef.current = activeChapter;
+  }, [activeChapter]);
+
+  useEffect(() => {
+    if (!showVideo) {
+      setVideoPlayingState("youtube_chatbot_course", false);
+      return;
+    }
+
+    let cancelled = false;
+
+    const clearPoll = () => {
+      if (ytPollRef.current !== null) {
+        window.clearInterval(ytPollRef.current);
+        ytPollRef.current = null;
+      }
+    };
+
+    const getPlayerMetrics = (player: YTPlayer | null) => {
+      try {
+        const current = player ? Math.round(player.getCurrentTime() * 10) / 10 : 0;
+        const duration = player ? Math.round(player.getDuration() * 10) / 10 : 0;
+        const pct = duration > 0 ? Math.min(100, Math.round((current / duration) * 100)) : 0;
+        return { current, duration, pct };
+      } catch {
+        return { current: 0, duration: 0, pct: 0 };
+      }
+    };
+
+    const checkMilestones = (player: YTPlayer | null) => {
+      const { current, duration, pct } = getPlayerMetrics(player);
+      for (const milestone of YOUTUBE_MILESTONES) {
+        if (pct >= milestone && !ytMilestonesRef.current.has(milestone)) {
+          ytMilestonesRef.current.add(milestone);
+          trackEvent("video_progress", {
+            video_id: "youtube_chatbot_course",
+            video_title: "Build a Pro-Level AI Chatbot at $0 Investment",
+            progress_percent: milestone,
+            current_time_sec: current,
+            duration_sec: duration,
+            active_chapter: activeChapterRef.current.title,
+          });
+        }
+      }
+    };
+
+    const attachPlayer = () => {
+      if (cancelled || !window.YT?.Player) return;
+      const iframeEl = document.getElementById("chatbot-video-player");
+      if (!iframeEl) return;
+
+      playerReadyRef.current = false;
+      const player = new window.YT.Player("chatbot-video-player", {
+        events: {
+          onReady: (ev) => {
+            if (cancelled) return;
+            playerRef.current = ev.target;
+            playerReadyRef.current = true;
+            if (pendingSeekRef.current !== null) {
+              const targetTime = pendingSeekRef.current;
+              pendingSeekRef.current = null;
+              ev.target.seekTo(targetTime, true);
+              ev.target.playVideo();
+            }
+          },
+          onStateChange: (ev) => {
+            if (cancelled) return;
+            const state = ev.data;
+            const { current, duration, pct } = getPlayerMetrics(ev.target);
+
+            // 1 = PLAYING, 2 = PAUSED, 0 = ENDED
+            if (state === 1) {
+              setVideoPlayingState("youtube_chatbot_course", true);
+              if (!ytStartedRef.current) {
+                ytStartedRef.current = true;
+                trackEvent("video_start", {
+                  video_id: "youtube_chatbot_course",
+                  video_title: "Build a Pro-Level AI Chatbot at $0 Investment",
+                  duration_sec: duration,
+                  active_chapter: activeChapterRef.current.title,
+                });
+              } else {
+                trackEvent("video_play", {
+                  video_id: "youtube_chatbot_course",
+                  current_time_sec: current,
+                  duration_sec: duration,
+                  percent_watched: pct,
+                  active_chapter: activeChapterRef.current.title,
+                });
+              }
+
+              clearPoll();
+              ytPollRef.current = window.setInterval(() => {
+                addVideoWatchSeconds(1);
+                checkMilestones(playerRef.current);
+              }, 1000);
+            } else if (state === 2) {
+              clearPoll();
+              setVideoPlayingState("youtube_chatbot_course", false);
+              trackEvent("video_pause", {
+                video_id: "youtube_chatbot_course",
+                current_time_sec: current,
+                duration_sec: duration,
+                percent_watched: pct,
+                active_chapter: activeChapterRef.current.title,
+              });
+            } else if (state === 0) {
+              clearPoll();
+              setVideoPlayingState("youtube_chatbot_course", false);
+              checkMilestones(ev.target);
+              trackEvent("video_ended", {
+                video_id: "youtube_chatbot_course",
+                duration_sec: duration,
+              });
+            }
+          },
+        },
+      });
+      playerRef.current = player;
+    };
+
+    if (window.YT?.Player) {
+      attachPlayer();
+    } else {
+      const prevReady = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        if (typeof prevReady === "function") prevReady();
+        attachPlayer();
+      };
+
+      if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+        const tag = document.createElement("script");
+        tag.src = "https://www.youtube.com/iframe_api";
+        tag.async = true;
+        document.head.appendChild(tag);
+      }
+    }
+
+    return () => {
+      cancelled = true;
+      clearPoll();
+      setVideoPlayingState("youtube_chatbot_course", false);
+      playerReadyRef.current = false;
+      try {
+        playerRef.current?.destroy?.();
+      } catch {
+        // Ignore teardown issues
+      }
+      playerRef.current = null;
+    };
+  }, [showVideo]);
+
+  const handleFilterChange = (filter: "all" | "video" | "book1" | "book2") => {
+    setSelectedFilter(filter);
+    trackEvent("resources_filter_select", { filter });
+  };
 
   const handleSelectChapter = (ch: Chapter) => {
     setActiveChapter(ch);
+    trackEvent("video_chapter_select", {
+      video_id: "youtube_chatbot_course",
+      chapter_time: ch.time,
+      chapter_title: ch.title,
+      chapter_category: ch.category || "",
+    });
+    if (playerReadyRef.current && playerRef.current) {
+      try {
+        playerRef.current.seekTo(ch.time, true);
+        playerRef.current.playVideo();
+        return;
+      } catch {
+        // Fallback below
+      }
+    }
+    pendingSeekRef.current = ch.time;
+  };
+
+  const handleBookStoreClick = (bookId: string, storeName: string) => {
+    trackEvent("book_store_click", {
+      book_id: bookId,
+      store_name: storeName,
+    });
+  };
+
+  const handleTocToggle = (bookId: "book1" | "book2") => {
+    if (bookId === "book1") {
+      const next = !isToc1Open;
+      setIsToc1Open(next);
+      trackEvent("book_toc_toggle", {
+        book_id: "basic_data_setup_book",
+        state: next ? "opened" : "closed",
+      });
+    } else {
+      const next = !isToc2Open;
+      setIsToc2Open(next);
+      trackEvent("book_toc_toggle", {
+        book_id: "build_ai_chatbot_book",
+        state: next ? "opened" : "closed",
+      });
+    }
   };
 
   return (
     <div className="min-h-screen py-20 relative z-10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
+
         {/* Header */}
-        <div className="text-center mb-14">
+        <div data-track-section="resources_header" className="text-center mb-14">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -102,42 +319,38 @@ export default function ResourcesPage() {
           {/* Quick Filter Navigation */}
           <div className="flex flex-wrap items-center justify-center gap-3 mt-8">
             <button
-              onClick={() => setSelectedFilter("all")}
-              className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${
-                selectedFilter === "all"
-                  ? "bg-electric-cyan text-obsidian shadow-[0_0_20px_rgba(102,252,241,0.4)]"
-                  : "glass text-gray-300 hover:text-white hover:border-electric-cyan/40"
-              }`}
+              onClick={() => handleFilterChange("all")}
+              className={`px-5 py-2 rounded-full text-sm font-medium transition-all ${selectedFilter === "all"
+                ? "bg-electric-cyan text-obsidian shadow-[0_0_20px_rgba(102,252,241,0.4)]"
+                : "glass text-gray-300 hover:text-white hover:border-electric-cyan/40"
+                }`}
             >
               All Resources
             </button>
             <button
-              onClick={() => setSelectedFilter("video")}
-              className={`px-5 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
-                selectedFilter === "video"
-                  ? "bg-electric-cyan text-obsidian shadow-[0_0_20px_rgba(102,252,241,0.4)]"
-                  : "glass text-gray-300 hover:text-white hover:border-electric-cyan/40"
-              }`}
+              onClick={() => handleFilterChange("video")}
+              className={`px-5 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${selectedFilter === "video"
+                ? "bg-electric-cyan text-obsidian shadow-[0_0_20px_rgba(102,252,241,0.4)]"
+                : "glass text-gray-300 hover:text-white hover:border-electric-cyan/40"
+                }`}
             >
               <Video className="w-4 h-4" /> Free Video Course
             </button>
             <button
-              onClick={() => setSelectedFilter("book1")}
-              className={`px-5 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
-                selectedFilter === "book1"
-                  ? "bg-electric-cyan text-obsidian shadow-[0_0_20px_rgba(102,252,241,0.4)]"
-                  : "glass text-gray-300 hover:text-white hover:border-electric-cyan/40"
-              }`}
+              onClick={() => handleFilterChange("book1")}
+              className={`px-5 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${selectedFilter === "book1"
+                ? "bg-electric-cyan text-obsidian shadow-[0_0_20px_rgba(102,252,241,0.4)]"
+                : "glass text-gray-300 hover:text-white hover:border-electric-cyan/40"
+                }`}
             >
               <BookOpen className="w-4 h-4" /> Part 1: Data Setup Guide
             </button>
             <button
-              onClick={() => setSelectedFilter("book2")}
-              className={`px-5 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${
-                selectedFilter === "book2"
-                  ? "bg-electric-violet text-white shadow-[0_0_20px_rgba(178,0,255,0.4)]"
-                  : "glass text-gray-300 hover:text-white hover:border-electric-violet/40"
-              }`}
+              onClick={() => handleFilterChange("book2")}
+              className={`px-5 py-2 rounded-full text-sm font-medium transition-all flex items-center gap-2 ${selectedFilter === "book2"
+                ? "bg-electric-violet text-white shadow-[0_0_20px_rgba(178,0,255,0.4)]"
+                : "glass text-gray-300 hover:text-white hover:border-electric-violet/40"
+                }`}
             >
               <BookOpen className="w-4 h-4" /> Part 2: AI Chatbot Guide
             </button>
@@ -150,6 +363,7 @@ export default function ResourcesPage() {
           {(selectedFilter === "all" || selectedFilter === "video") && (
             <motion.section
               id="build_ai_chatbot_at_no_invest"
+              data-track-section="resources_video_course"
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -239,28 +453,25 @@ export default function ResourcesPage() {
                         <button
                           key={idx}
                           onClick={() => handleSelectChapter(ch)}
-                          className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between gap-3 ${
-                            isCurrent
-                              ? "bg-electric-cyan/20 border border-electric-cyan text-white shadow-[0_0_15px_rgba(102,252,241,0.2)]"
-                              : "hover:bg-slate/70 text-gray-300 border border-transparent"
-                          }`}
+                          className={`w-full text-left p-2.5 rounded-xl transition-all flex items-center justify-between gap-3 ${isCurrent
+                            ? "bg-electric-cyan/20 border border-electric-cyan text-white shadow-[0_0_15px_rgba(102,252,241,0.2)]"
+                            : "hover:bg-slate/70 text-gray-300 border border-transparent"
+                            }`}
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <span
-                              className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${
-                                isCurrent
-                                  ? "bg-electric-cyan text-obsidian"
-                                  : "bg-slate text-electric-cyan-dim"
-                              }`}
+                              className={`text-xs font-mono font-bold px-2 py-0.5 rounded-md ${isCurrent
+                                ? "bg-electric-cyan text-obsidian"
+                                : "bg-slate text-electric-cyan-dim"
+                                }`}
                             >
                               {ch.timeStr}
                             </span>
                             <span className="text-xs truncate font-medium">{ch.title}</span>
                           </div>
                           <PlayCircle
-                            className={`w-4 h-4 flex-shrink-0 ${
-                              isCurrent ? "text-electric-cyan" : "text-gray-500 opacity-60"
-                            }`}
+                            className={`w-4 h-4 flex-shrink-0 ${isCurrent ? "text-electric-cyan" : "text-gray-500 opacity-60"
+                              }`}
                           />
                         </button>
                       );
@@ -307,6 +518,7 @@ export default function ResourcesPage() {
           {(selectedFilter === "all" || selectedFilter === "book1") && (
             <motion.section
               id="basic_data_setup_book"
+              data-track-section="resources_book1"
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -314,7 +526,7 @@ export default function ResourcesPage() {
               className="glass-card p-6 md:p-12 border-electric-cyan/30 relative overflow-hidden"
             >
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-                
+
                 {/* Book Cover */}
                 <div className="lg:col-span-4 flex justify-center">
                   <div className="relative group max-w-[280px] sm:max-w-[320px] w-full">
@@ -374,6 +586,7 @@ export default function ResourcesPage() {
                         href="https://a.co/d/gCwuHPW"
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => handleBookStoreClick("basic_data_setup_book", "amazon_kindle")}
                         className="px-4 py-2 rounded-lg bg-electric-cyan text-obsidian text-xs font-bold hover:bg-white transition-all flex items-center gap-1.5 shadow-[0_0_15px_rgba(102,252,241,0.25)]"
                       >
                         Amazon Kindle <ArrowUpRight className="w-3.5 h-3.5" />
@@ -382,6 +595,7 @@ export default function ResourcesPage() {
                         href="https://a.co/d/0bv4Z9y"
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => handleBookStoreClick("basic_data_setup_book", "amazon_paperback")}
                         className="px-4 py-2 rounded-lg glass border border-white/20 text-white text-xs font-medium hover:bg-white/10 transition-colors flex items-center gap-1.5"
                       >
                         Amazon Paperback <ArrowUpRight className="w-3.5 h-3.5" />
@@ -390,6 +604,7 @@ export default function ResourcesPage() {
                         href="https://a.co/d/aSnbeEl"
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => handleBookStoreClick("basic_data_setup_book", "amazon_hardcover")}
                         className="px-4 py-2 rounded-lg glass border border-white/20 text-white text-xs font-medium hover:bg-white/10 transition-colors flex items-center gap-1.5"
                       >
                         Amazon Hardcover <ArrowUpRight className="w-3.5 h-3.5" />
@@ -398,6 +613,7 @@ export default function ResourcesPage() {
                         href="https://books.google.com.sg/books?id=gwFAEQAAQBAJ"
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => handleBookStoreClick("basic_data_setup_book", "google_books")}
                         className="px-4 py-2 rounded-lg glass border border-white/20 text-white text-xs font-medium hover:bg-white/10 transition-colors flex items-center gap-1.5"
                       >
                         Google Books <ArrowUpRight className="w-3.5 h-3.5" />
@@ -406,6 +622,7 @@ export default function ResourcesPage() {
                         href="https://books.apple.com/us/book/data-for-entrepreneurs-part-i-basic-data-setup-guide/id6740886315"
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => handleBookStoreClick("basic_data_setup_book", "apple_books")}
                         className="px-4 py-2 rounded-lg glass border border-white/20 text-white text-xs font-medium hover:bg-white/10 transition-colors flex items-center gap-1.5"
                       >
                         Apple Books <ArrowUpRight className="w-3.5 h-3.5" />
@@ -414,6 +631,7 @@ export default function ResourcesPage() {
                         href="https://store.pothi.com/book/nikhil-sahai-data-entrepreneurs-part-1-basic-data-setup-guide/"
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => handleBookStoreClick("basic_data_setup_book", "pothi")}
                         className="px-4 py-2 rounded-lg glass border border-electric-cyan/40 text-electric-cyan text-xs font-medium hover:bg-electric-cyan/10 transition-colors flex items-center gap-1.5"
                       >
                         Pothi (India Print) <ArrowUpRight className="w-3.5 h-3.5" />
@@ -424,7 +642,7 @@ export default function ResourcesPage() {
                   {/* Toggle Table of Contents */}
                   <div>
                     <button
-                      onClick={() => setIsToc1Open(!isToc1Open)}
+                      onClick={() => handleTocToggle("book1")}
                       className="inline-flex items-center gap-2 text-sm text-electric-cyan hover:underline font-semibold"
                     >
                       <Layers className="w-4 h-4" />
@@ -478,6 +696,7 @@ export default function ResourcesPage() {
           {(selectedFilter === "all" || selectedFilter === "book2") && (
             <motion.section
               id="build_ai_chatbot_book"
+              data-track-section="resources_book2"
               initial={{ opacity: 0, y: 30 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
@@ -485,7 +704,7 @@ export default function ResourcesPage() {
               className="glass-card p-6 md:p-12 border-electric-violet/30 relative overflow-hidden"
             >
               <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 items-center">
-                
+
                 {/* Book Cover */}
                 <div className="lg:col-span-4 flex justify-center order-1 lg:order-2">
                   <div className="relative group max-w-[280px] sm:max-w-[320px] w-full">
@@ -509,7 +728,7 @@ export default function ResourcesPage() {
                     Part 2 • AI Playbook
                   </div>
                   <h2 className="text-3xl md:text-5xl font-extrabold text-white mb-2">
-                    AI Chatbot Builder's Guide
+                    AI Chatbot Builder&apos;s Guide
                   </h2>
                   <p className="text-electric-violet-light text-base md:text-lg font-medium mb-4">
                     A Practical Playbook for Startups to Build Smart AI Chatbots
@@ -545,6 +764,7 @@ export default function ResourcesPage() {
                         href="https://www.amazon.in/dp/B0FDS5XF2H"
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => handleBookStoreClick("build_ai_chatbot_book", "amazon_kindle")}
                         className="px-4 py-2 rounded-lg bg-electric-violet text-white text-xs font-bold hover:bg-neon-purple transition-all flex items-center gap-1.5 shadow-[0_0_15px_rgba(178,0,255,0.3)]"
                       >
                         Amazon Kindle <ArrowUpRight className="w-3.5 h-3.5" />
@@ -553,6 +773,7 @@ export default function ResourcesPage() {
                         href="https://www.amazon.com/dp/9811775915"
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => handleBookStoreClick("build_ai_chatbot_book", "amazon_paperback")}
                         className="px-4 py-2 rounded-lg glass border border-white/20 text-white text-xs font-medium hover:bg-white/10 transition-colors flex items-center gap-1.5"
                       >
                         Amazon Paperback <ArrowUpRight className="w-3.5 h-3.5" />
@@ -561,6 +782,7 @@ export default function ResourcesPage() {
                         href="https://play.google.com/store/books/details?id=JgNnEQAAQBAJ"
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => handleBookStoreClick("build_ai_chatbot_book", "google_books")}
                         className="px-4 py-2 rounded-lg glass border border-white/20 text-white text-xs font-medium hover:bg-white/10 transition-colors flex items-center gap-1.5"
                       >
                         Google Books <ArrowUpRight className="w-3.5 h-3.5" />
@@ -569,6 +791,7 @@ export default function ResourcesPage() {
                         href="https://books.apple.com/us/book/ai-chatbot-builders-guide/id6747532436?ls=1"
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => handleBookStoreClick("build_ai_chatbot_book", "apple_books")}
                         className="px-4 py-2 rounded-lg glass border border-white/20 text-white text-xs font-medium hover:bg-white/10 transition-colors flex items-center gap-1.5"
                       >
                         Apple Books <ArrowUpRight className="w-3.5 h-3.5" />
@@ -577,6 +800,7 @@ export default function ResourcesPage() {
                         href="https://store.pothi.com/book/nikhil-sahai-ai-chatbot-builder%E2%80%99s-guide-data-entrepreneurs/"
                         target="_blank"
                         rel="noopener noreferrer"
+                        onClick={() => handleBookStoreClick("build_ai_chatbot_book", "pothi")}
                         className="px-4 py-2 rounded-lg glass border border-electric-violet/40 text-electric-violet-light text-xs font-medium hover:bg-electric-violet/10 transition-colors flex items-center gap-1.5"
                       >
                         Pothi (India Hardcover) <ArrowUpRight className="w-3.5 h-3.5" />
@@ -587,7 +811,7 @@ export default function ResourcesPage() {
                   {/* Toggle Table of Contents */}
                   <div>
                     <button
-                      onClick={() => setIsToc2Open(!isToc2Open)}
+                      onClick={() => handleTocToggle("book2")}
                       className="inline-flex items-center gap-2 text-sm text-electric-violet-light hover:underline font-semibold"
                     >
                       <Layers className="w-4 h-4" />
@@ -638,7 +862,7 @@ export default function ResourcesPage() {
           )}
 
           {/* Bottom Callout: Need 1:1 Consultation */}
-          <div className="glass-card p-8 md:p-10 text-center border-electric-cyan/20">
+          <div data-track-section="resources_consultation_cta" className="glass-card p-8 md:p-10 text-center border-electric-cyan/20">
             <ShieldCheck className="w-12 h-12 text-electric-cyan mx-auto mb-4" />
             <h3 className="text-2xl font-bold text-white mb-2">Need Hands-On Architecture or Consulting?</h3>
             <p className="text-gray-300 max-w-2xl mx-auto mb-6 text-sm md:text-base">
@@ -647,12 +871,14 @@ export default function ResourcesPage() {
             <div className="flex flex-wrap items-center justify-center gap-4">
               <a
                 href="/contact"
+                data-track-cta="resources_schedule_consultation"
                 className="px-6 py-3 rounded-xl bg-gradient-to-r from-electric-cyan to-electric-violet text-obsidian font-bold hover:opacity-90 transition-opacity"
               >
                 Schedule Founder Consultation
               </a>
               <a
                 href="/diad"
+                data-track-cta="resources_explore_diad"
                 className="px-6 py-3 rounded-xl glass border border-white/20 text-white font-semibold hover:bg-white/10 transition-colors"
               >
                 Explore DIAD Platform

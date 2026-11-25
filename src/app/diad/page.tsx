@@ -1,9 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import TrustCenter from "@/components/TrustCenter";
 import PilotRegistrationModal from "@/components/PilotRegistrationModal";
+import DiadVideoShowcase from "@/components/DiadVideoShowcase";
 import { motion } from "framer-motion";
+import { trackEvent } from "@/lib/analytics";
 import {
   Terminal,
   Copy,
@@ -28,11 +30,13 @@ export default function DiadPage() {
   const [copied, setCopied] = useState(false);
   const [activeTab, setActiveTab] = useState<"customer" | "internal">("customer");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [modalTriggerSource, setModalTriggerSource] = useState<string>("hero_card");
 
   // Cloud Cost Calculator State
   const [calcOrders, setCalcOrders] = useState(2500);
   const [calcQueries, setCalcQueries] = useState(150);
   const [calcDocs, setCalcDocs] = useState(35);
+  const calcSkipInitialRef = useRef(true);
 
   const costCloudRun = (calcQueries * 30 > 2000000) ? ((calcQueries * 30 - 2000000) * 0.0000004).toFixed(2) : "0.00";
   const costBq = (0.50 + (calcOrders * 0.0011)).toFixed(2);
@@ -40,10 +44,28 @@ export default function DiadPage() {
   const costAi = ((calcQueries * 30 * 0.002) + (calcDocs * 0.02)).toFixed(2);
   const totalCost = (parseFloat(costCloudRun) + parseFloat(costBq) + parseFloat(costSecrets) + parseFloat(costAi)).toFixed(2);
 
+  useEffect(() => {
+    if (calcSkipInitialRef.current) {
+      calcSkipInitialRef.current = false;
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      trackEvent("cost_calculator_adjusted", {
+        orders: calcOrders,
+        queries: calcQueries,
+        docs: calcDocs,
+        estimated_monthly_sgd: Number(totalCost),
+      });
+    }, 800);
+    return () => window.clearTimeout(timer);
+  }, [calcOrders, calcQueries, calcDocs, totalCost]);
+
   const psCommand = `irm https://raw.githubusercontent.com/dataforentrepreneurs/DIAD_Scaffold/main/setup.ps1 | iex`;
 
-  const handleDownloadClick = (e?: React.MouseEvent) => {
+  const handleDownloadClick = (source: string = "hero_card", e?: React.MouseEvent) => {
     if (e) e.preventDefault();
+    setModalTriggerSource(source);
+    trackEvent("diad_download_cta_click", { location: source });
     // Always open modal so credentials & license terms can be reviewed or edited
     setIsModalOpen(true);
   };
@@ -52,13 +74,21 @@ export default function DiadPage() {
     try {
       const existingLead = localStorage.getItem("diad_pilot_lead");
       if (!existingLead) {
+        trackEvent("diad_ps_command_copy", { gated_by_modal: true });
+        setModalTriggerSource("ps_command_gate");
         setIsModalOpen(true);
         return;
       }
-    } catch {}
+    } catch { }
     navigator.clipboard.writeText(psCommand);
+    trackEvent("diad_ps_command_copy", { gated_by_modal: false });
     setCopied(true);
     setTimeout(() => setCopied(false), 3000);
+  };
+
+  const handleChatbotTabSwitch = (tab: "customer" | "internal") => {
+    setActiveTab(tab);
+    trackEvent("chatbot_preview_tab_switch", { tab });
   };
 
   const steps = [
@@ -114,9 +144,9 @@ export default function DiadPage() {
       <div className="absolute bottom-1/3 right-10 w-[450px] h-[350px] bg-electric-cyan/10 blur-[120px] rounded-full pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        
+
         {/* Header Hero Section */}
-        <div className="text-center max-w-4xl mx-auto mb-14">
+        <div data-track-section="diad_hero" className="text-center max-w-4xl mx-auto mb-14">
           <motion.div
             initial={{ opacity: 0, y: -10 }}
             animate={{ opacity: 1, y: 0 }}
@@ -142,12 +172,18 @@ export default function DiadPage() {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-lg sm:text-xl text-gray-300 leading-relaxed font-light"
           >
-            Turn your store's raw data into an intelligent AI assistant that knows everything about your business — running <strong>100% inside your own Google Cloud account</strong>.
+            Turn your store&apos;s raw data into an intelligent AI assistant that knows everything about your business — running <strong>100% inside your own Google Cloud account</strong>.
           </motion.p>
+        </div>
+
+        {/* Interactive DIAD Videos & Chapters Showcase */}
+        <div data-track-section="diad_video_showcase">
+          <DiadVideoShowcase />
         </div>
 
         {/* 1-Click Deployment Hero Card */}
         <motion.div
+          data-track-section="diad_deploy_card"
           initial={{ opacity: 0, scale: 0.96 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.6, delay: 0.3 }}
@@ -165,7 +201,8 @@ export default function DiadPage() {
             </div>
 
             <button
-              onClick={handleDownloadClick}
+              onClick={(e) => handleDownloadClick("hero_card", e)}
+              data-track-cta="diad_hero_download_installer"
               className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-gradient-to-r from-electric-violet to-neon-purple text-white font-semibold text-sm hover:opacity-90 transition-all shadow-lg shadow-neon-purple/20 flex-shrink-0 cursor-pointer"
             >
               <Download className="w-4 h-4" />
@@ -184,11 +221,10 @@ export default function DiadPage() {
             </span>
             <button
               onClick={handleCopy}
-              className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg font-sans text-xs font-semibold transition-all ${
-                copied
-                  ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
-                  : "bg-electric-violet/30 text-white border border-electric-violet/50 hover:bg-electric-violet/50"
-              }`}
+              className={`flex-shrink-0 flex items-center gap-2 px-4 py-2 rounded-lg font-sans text-xs font-semibold transition-all ${copied
+                ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/40"
+                : "bg-electric-violet/30 text-white border border-electric-violet/50 hover:bg-electric-violet/50"
+                }`}
             >
               {copied ? (
                 <>
@@ -213,6 +249,7 @@ export default function DiadPage() {
 
         {/* Self-Hosted Cloud Operating Cost Calculator */}
         <motion.div
+          data-track-section="diad_cost_calculator"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -349,7 +386,7 @@ export default function DiadPage() {
         </motion.div>
 
         {/* Feature Grid */}
-        <div className="mb-24">
+        <div data-track-section="diad_features" className="mb-24">
           <div className="text-center mb-12">
             <h2 className="text-2xl sm:text-4xl font-bold text-white mb-4">Why Merchants Choose DIAD</h2>
             <p className="text-gray-400 max-w-2xl mx-auto text-sm sm:text-base">
@@ -378,7 +415,7 @@ export default function DiadPage() {
         </div>
 
         {/* Dual AI Chatbot Interactive Preview Showcase */}
-        <div className="mb-24 max-w-5xl mx-auto">
+        <div data-track-section="diad_dual_chatbot_preview" className="mb-24 max-w-5xl mx-auto">
           <div className="text-center mb-10">
             <h2 className="text-2xl sm:text-4xl font-bold text-white mb-3">Two Specialized AI Assistants Out-of-the-Box</h2>
             <p className="text-gray-400 text-sm sm:text-base">One public bot to delight your customers; one private advisor to run your business.</p>
@@ -388,23 +425,21 @@ export default function DiadPage() {
           <div className="flex justify-center mb-8">
             <div className="bg-slate/70 p-1.5 rounded-xl border border-slate flex gap-2">
               <button
-                onClick={() => setActiveTab("customer")}
-                className={`px-5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
-                  activeTab === "customer"
-                    ? "bg-electric-cyan text-obsidian shadow-lg shadow-electric-cyan/20"
-                    : "text-gray-400 hover:text-white"
-                }`}
+                onClick={() => handleChatbotTabSwitch("customer")}
+                className={`px-5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === "customer"
+                  ? "bg-electric-cyan text-obsidian shadow-lg shadow-electric-cyan/20"
+                  : "text-gray-400 hover:text-white"
+                  }`}
               >
                 <ShoppingBag className="w-4 h-4" />
                 Customer Support Assistant
               </button>
               <button
-                onClick={() => setActiveTab("internal")}
-                className={`px-5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${
-                  activeTab === "internal"
-                    ? "bg-neon-purple text-white shadow-lg shadow-neon-purple/20"
-                    : "text-gray-400 hover:text-white"
-                }`}
+                onClick={() => handleChatbotTabSwitch("internal")}
+                className={`px-5 py-2.5 rounded-lg text-xs sm:text-sm font-semibold transition-all flex items-center gap-2 ${activeTab === "internal"
+                  ? "bg-neon-purple text-white shadow-lg shadow-neon-purple/20"
+                  : "text-gray-400 hover:text-white"
+                  }`}
               >
                 <BarChart3 className="w-4 h-4" />
                 Executive BI Advisor
@@ -430,10 +465,10 @@ export default function DiadPage() {
                 </div>
                 <div className="bg-obsidian/90 p-5 rounded-xl border border-electric-cyan/30 text-xs font-sans space-y-3">
                   <div className="bg-slate/40 p-3 rounded-lg text-gray-300">
-                    <strong>Shopper:</strong> "Where is my order #1002?"
+                    <strong>Shopper:</strong> &ldquo;Where is my order #1002?&rdquo;
                   </div>
                   <div className="bg-electric-cyan/10 p-3 rounded-lg text-electric-cyan border border-electric-cyan/20">
-                    <strong>AI Assistant:</strong> "Your order #1002 was fulfilled via FedEx (Tracking: 94001000...). It is currently Out for Delivery and expected by 4:00 PM today!"
+                    <strong>AI Assistant:</strong> &ldquo;Your order #1002 was fulfilled via FedEx (Tracking: 94001000...). It is currently Out for Delivery and expected by 4:00 PM today!&rdquo;
                   </div>
                 </div>
               </div>
@@ -453,10 +488,10 @@ export default function DiadPage() {
                 </div>
                 <div className="bg-obsidian/90 p-5 rounded-xl border border-neon-purple/30 text-xs font-sans space-y-3">
                   <div className="bg-slate/40 p-3 rounded-lg text-gray-300">
-                    <strong>Founder:</strong> "What was our total revenue and refund rate last week?"
+                    <strong>Founder:</strong> &ldquo;What was our total revenue and refund rate last week?&rdquo;
                   </div>
                   <div className="bg-neon-purple/10 p-3 rounded-lg text-gray-200 border border-neon-purple/20">
-                    <strong>BI Advisor:</strong> "Last week revenue totaled $48,320 across 412 orders. The refund rate was 2.4% (down 0.8% from previous week). Top selling category: Fine Jewelry."
+                    <strong>BI Advisor:</strong> &ldquo;Last week revenue totaled $48,320 across 412 orders. The refund rate was 2.4% (down 0.8% from previous week). Top selling category: Fine Jewelry.&rdquo;
                   </div>
                 </div>
               </div>
@@ -465,7 +500,7 @@ export default function DiadPage() {
         </div>
 
         {/* 4-Step Process Section */}
-        <div className="mb-24">
+        <div data-track-section="diad_4_steps" className="mb-24">
           <div className="text-center mb-14">
             <h2 className="text-2xl sm:text-4xl font-bold text-white mb-4">From Zero to Production in 4 Steps</h2>
             <p className="text-gray-400 max-w-2xl mx-auto text-sm sm:text-base">
@@ -496,10 +531,13 @@ export default function DiadPage() {
         </div>
 
         {/* Trust & Governance Center */}
-        <TrustCenter />
+        <div data-track-section="diad_trust_center">
+          <TrustCenter />
+        </div>
 
         {/* Embed Anywhere Callout */}
         <motion.div
+          data-track-section="diad_embed_cta"
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
@@ -521,7 +559,8 @@ export default function DiadPage() {
           </div>
 
           <button
-            onClick={handleDownloadClick}
+            onClick={(e) => handleDownloadClick("bottom_embed_cta", e)}
+            data-track-cta="diad_bottom_launch_setup"
             className="inline-flex items-center gap-3 px-8 py-4 rounded-xl bg-electric-cyan text-obsidian font-extrabold text-base hover:bg-electric-cyan/90 transition-colors shadow-lg shadow-electric-cyan/20 group cursor-pointer"
           >
             Launch DIAD Setup Now
@@ -532,6 +571,7 @@ export default function DiadPage() {
         {/* Pilot Registration & Consent Modal */}
         <PilotRegistrationModal
           isOpen={isModalOpen}
+          triggerSource={modalTriggerSource}
           onClose={() => setIsModalOpen(false)}
         />
 

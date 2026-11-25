@@ -9,9 +9,10 @@ export default function AboutPage() {
   return (
     <div className="min-h-screen py-24 relative z-10">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        
+
         {/* Header */}
         <motion.div
+          data-track-section="about_header"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           className="text-center mb-16"
@@ -29,6 +30,7 @@ export default function AboutPage() {
 
         {/* Who We Are */}
         <motion.div
+          data-track-section="about_who_we_are"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
@@ -49,7 +51,7 @@ export default function AboutPage() {
         </motion.div>
 
         {/* What We Offer & Why Work With Us */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
+        <div data-track-section="about_offerings" className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-16">
           <motion.div
             initial={{ opacity: 0, x: -20 }}
             whileInView={{ opacity: 1, x: 0 }}
@@ -117,13 +119,14 @@ export default function AboutPage() {
 
         {/* Founder Bio: Nikhil Sahai */}
         <motion.div
+          data-track-section="about_founder_bio"
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           className="glass-card p-8 md:p-12 border-electric-cyan/30 relative overflow-hidden mb-12"
         >
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            
+
             <div className="lg:col-span-4 flex justify-center">
               <div className="relative group max-w-[260px] w-full">
                 <div className="absolute -inset-1.5 bg-gradient-to-r from-electric-cyan to-electric-violet rounded-2xl blur-lg opacity-40 group-hover:opacity-70 transition duration-500" />
@@ -145,15 +148,15 @@ export default function AboutPage() {
               </div>
               <h2 className="text-3xl font-extrabold text-white mb-2">Nikhil Sahai</h2>
               <p className="text-electric-cyan font-mono text-sm mb-4">
-                Master's in Business Analytics (SMU) • 15+ Years in Data & AI Leadership
+                Master&apos;s in Business Analytics (SMU) • 15+ Years in Data &amp; AI Leadership
               </p>
-              
+
               <div className="space-y-3 text-gray-300 text-sm md:text-base leading-relaxed">
                 <p>
                   Nikhil Sahai is a seasoned data analytics leader with extensive experience driving business growth across media-streaming, e-commerce, retail, and tech. Over the past decade, he has specialized in architecting scalable data systems from zero to IPO-readiness.
                 </p>
                 <p>
-                  As the author of the <em>Data for Entrepreneurs</em> series (Basic Data Setup Guide and AI Chatbot Builder's Guide), Nikhil translates intricate engineering concepts into practical, founder-friendly playbooks.
+                  As the author of the <em>Data for Entrepreneurs</em> series (Basic Data Setup Guide and AI Chatbot Builder&apos;s Guide), Nikhil translates intricate engineering concepts into practical, founder-friendly playbooks.
                 </p>
               </div>
 
@@ -183,9 +186,10 @@ export default function AboutPage() {
         </motion.div>
 
         {/* CTA */}
-        <div className="text-center">
+        <div data-track-section="about_cta" className="text-center">
           <Link
             href="/resources"
+            data-track-cta="about_explore_resources"
             className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-electric-cyan to-electric-violet text-obsidian font-bold hover:shadow-[0_0_30px_rgba(102,252,241,0.4)] transition-all"
           >
             Explore Founder Resources & Books <ArrowRight className="w-4 h-4" />

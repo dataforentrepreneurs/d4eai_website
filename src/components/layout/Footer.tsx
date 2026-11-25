@@ -52,13 +52,13 @@ export default function Footer() {
             &copy; {new Date().getFullYear()} Data for Entrepreneurs. All rights reserved.
           </p>
           <div className="flex items-center gap-6">
-            <Link href="/diad/terms" className="hover:text-electric-cyan transition-colors">
+            <Link href="/diad/terms" data-track-cta="footer_diad_terms" className="hover:text-electric-cyan transition-colors">
               DIAD Terms
             </Link>
-            <Link href="/diad/privacy" className="hover:text-electric-cyan transition-colors">
+            <Link href="/diad/privacy" data-track-cta="footer_privacy_policy" className="hover:text-electric-cyan transition-colors">
               Privacy Policy
             </Link>
-            <Link href="/diad#trust-center" className="hover:text-electric-cyan transition-colors">
+            <Link href="/diad#trust-center" data-track-cta="footer_trust_center" className="hover:text-electric-cyan transition-colors">
               Trust Center
             </Link>
           </div>

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Copy, Terminal } from "lucide-react";
 import { motion } from "framer-motion";
+import { trackEvent } from "@/lib/analytics";
 
 export default function ApiSnippet() {
   const [copied, setCopied] = useState(false);
@@ -26,6 +27,7 @@ console.log(response.insights);`;
   const handleCopy = () => {
     navigator.clipboard.writeText(codeSnippet);
     setCopied(true);
+    trackEvent("api_snippet_copied", { snippet: "integrate.ts" });
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -82,16 +84,16 @@ console.log(response.insights);`;
             <div className="p-6 overflow-x-auto">
               <pre className="font-mono text-sm leading-relaxed">
                 <code className="text-gray-300">
-                  <span className="text-electric-violet-light">import</span> &#123; D4eAgent &#125; <span className="text-electric-violet-light">from</span> <span className="text-electric-cyan-dim">'@d4e/ai-sdk'</span>;<br/><br/>
-                  <span className="text-gray-500">// Initialize your Agentic Data Assistant</span><br/>
+                  <span className="text-electric-violet-light">import</span> &#123; D4eAgent &#125; <span className="text-electric-violet-light">from</span> <span className="text-electric-cyan-dim">&apos;@d4e/ai-sdk&apos;</span>;<br/><br/>
+                  <span className="text-gray-500">{"// Initialize your Agentic Data Assistant"}</span><br/>
                   <span className="text-electric-violet-light">const</span> agent = <span className="text-electric-violet-light">new</span> <span className="text-electric-cyan">D4eAgent</span>(&#123;<br/>
                   &nbsp;&nbsp;apiKey: process.env.D4E_API_KEY,<br/>
-                  &nbsp;&nbsp;model: <span className="text-electric-cyan-dim">'d4e-pro-max'</span>,<br/>
+                  &nbsp;&nbsp;model: <span className="text-electric-cyan-dim">&apos;d4e-pro-max&apos;</span>,<br/>
                   &#125;);<br/><br/>
-                  <span className="text-gray-500">// Query your startup's data pipeline</span><br/>
+                  <span className="text-gray-500">{"// Query your startup's data pipeline"}</span><br/>
                   <span className="text-electric-violet-light">const</span> response = <span className="text-electric-violet-light">await</span> agent.<span className="text-electric-cyan">query</span>(&#123;<br/>
-                  &nbsp;&nbsp;instruction: <span className="text-electric-cyan-dim">"Analyze Q3 retention metrics and propose a strategy."</span>,<br/>
-                  &nbsp;&nbsp;context: <span className="text-electric-cyan-dim">"user_database_v2"</span><br/>
+                  &nbsp;&nbsp;instruction: <span className="text-electric-cyan-dim">&quot;Analyze Q3 retention metrics and propose a strategy.&quot;</span>,<br/>
+                  &nbsp;&nbsp;context: <span className="text-electric-cyan-dim">&quot;user_database_v2&quot;</span><br/>
                   &#125;);<br/><br/>
                   console.<span className="text-electric-cyan">log</span>(response.insights);
                 </code>

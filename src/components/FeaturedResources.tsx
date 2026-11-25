@@ -118,7 +118,7 @@ export default function FeaturedResources() {
               <div className="flex items-center gap-1 text-electric-violet-light text-xs font-semibold uppercase tracking-wider mb-2">
                 <BookOpen className="w-3.5 h-3.5" /> Part 2 • Playbook
               </div>
-              <h3 className="text-xl font-bold text-white mb-2">AI Chatbot Builder's Guide</h3>
+              <h3 className="text-xl font-bold text-white mb-2">AI Chatbot Builder&apos;s Guide</h3>
               <p className="text-gray-400 text-sm leading-relaxed mb-6">
                 End-to-end blueprint for launching proprietary RAG-based chatbots without third-party platform lock-in.
               </p>

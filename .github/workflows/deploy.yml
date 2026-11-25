@@ -34,6 +34,8 @@ jobs:
         run: npm ci
 
       - name: Build Next.js site
+        env:
+          NEXT_PUBLIC_CLARITY_PROJECT_ID: ${{ vars.NEXT_PUBLIC_CLARITY_PROJECT_ID }}
         run: npm run build
 
       - name: Upload artifact

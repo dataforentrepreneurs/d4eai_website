@@ -8,6 +8,7 @@ export default function PlayPage() {
     <div className="min-h-[85vh] flex items-center justify-center py-20 relative overflow-hidden">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10 w-full">
         <motion.div
+          data-track-section="play_showcase"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6 }}
@@ -24,7 +25,7 @@ export default function PlayPage() {
           </h1>
 
           <p className="text-base sm:text-lg text-gray-300 mb-10 max-w-2xl mx-auto leading-relaxed">
-            An applied demonstration of Data for Entrepreneurs' real-time agentic architecture. We push the boundaries of multi-agent coordination, sub-50ms WebSocket synchronization, and dynamic LLM game masters.
+            An applied demonstration of Data for Entrepreneurs&apos; real-time agentic architecture. We push the boundaries of multi-agent coordination, sub-50ms WebSocket synchronization, and dynamic LLM game masters.
           </p>
 
           {/* Technical feature cards */}
@@ -60,6 +61,7 @@ export default function PlayPage() {
               href="https://play.d4e.ai"
               target="_blank"
               rel="noopener noreferrer"
+              data-track-cta="play_launch_games_lab"
               className="inline-flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-electric-cyan to-electric-cyan-dim text-obsidian font-bold text-base hover:shadow-[0_0_25px_rgba(56,189,248,0.4)] transition-all"
             >
               Launch AI Games Lab
@@ -67,6 +69,7 @@ export default function PlayPage() {
             </a>
             <a
               href="/diad"
+              data-track-cta="play_learn_diad_stack"
               className="inline-flex items-center gap-2 px-6 py-3.5 rounded-xl glass border border-white/20 text-white font-medium text-sm hover:bg-white/10 transition-colors"
             >
               Learn about the underlying DIAD stack

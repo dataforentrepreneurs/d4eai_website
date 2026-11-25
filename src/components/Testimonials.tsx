@@ -59,7 +59,7 @@ export default function Testimonials() {
                 </div>
                 <Quote className="w-8 h-8 text-electric-cyan/30 mb-4" />
                 <p className="text-gray-300 text-sm md:text-base leading-relaxed mb-6 italic">
-                  "{item.quote}"
+                  &ldquo;{item.quote}&rdquo;
                 </p>
               </div>
 

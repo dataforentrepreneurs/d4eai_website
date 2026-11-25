@@ -14,7 +14,6 @@ import {
   BookOpen,
   ArrowRight,
   Zap,
-  Gamepad2,
 } from "lucide-react";
 
 export default function Hero() {
@@ -39,7 +38,7 @@ export default function Hero() {
         videoRef.current.pause();
         setIsPlaying(false);
       } else {
-        videoRef.current.play();
+        void videoRef.current.play();
         setIsPlaying(true);
       }
     }
@@ -47,15 +46,16 @@ export default function Hero() {
 
   const toggleMute = () => {
     if (videoRef.current) {
-      videoRef.current.muted = !isMuted;
-      setIsMuted(!isMuted);
+      const nextMuted = !isMuted;
+      videoRef.current.muted = nextMuted;
+      setIsMuted(nextMuted);
     }
   };
 
   const handleRestart = () => {
     if (videoRef.current) {
       videoRef.current.currentTime = 0;
-      videoRef.current.play();
+      void videoRef.current.play();
       setIsPlaying(true);
     }
   };
@@ -63,7 +63,7 @@ export default function Hero() {
   const handleFullscreen = () => {
     if (videoRef.current) {
       if (videoRef.current.requestFullscreen) {
-        videoRef.current.requestFullscreen();
+        void videoRef.current.requestFullscreen();
       }
     }
   };
@@ -127,6 +127,7 @@ export default function Hero() {
         >
           <Link
             href="/diad"
+            data-track-cta="hero_explore_diad"
             className="flex items-center gap-2 px-8 py-3.5 rounded-xl bg-gradient-to-r from-electric-cyan to-electric-cyan-dim text-obsidian font-bold text-base hover:shadow-[0_0_30px_rgba(102,252,241,0.5)] hover:scale-[1.02] transition-all"
           >
             <Zap className="w-5 h-5 fill-current" />
@@ -135,6 +136,7 @@ export default function Hero() {
 
           <Link
             href="/resources"
+            data-track-cta="hero_founder_books"
             className="flex items-center gap-2 px-7 py-3.5 rounded-xl glass border border-white/20 text-white font-semibold text-base hover:bg-white/10 hover:border-white/40 transition-all"
           >
             <BookOpen className="w-5 h-5 text-electric-cyan" />
@@ -267,6 +269,7 @@ export default function Hero() {
               </span>
               <Link
                 href="/resources#build_ai_chatbot_at_no_invest"
+                data-track-cta="hero_watch_22min_tutorial"
                 className="text-electric-cyan hover:underline flex items-center gap-1 font-medium whitespace-nowrap"
               >
                 Watch full 22-min tutorial <ArrowRight className="w-3 h-3" />

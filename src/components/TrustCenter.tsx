@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
+import { trackEvent } from "@/lib/analytics";
 import {
   ShieldCheck,
   Server,
@@ -24,8 +25,19 @@ export default function TrustCenter() {
   const [activeTab, setActiveTab] = useState<"architecture" | "security" | "subprocessors" | "legal">("architecture");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
 
+  const handleTabChange = (tab: "architecture" | "security" | "subprocessors" | "legal") => {
+    setActiveTab(tab);
+    trackEvent("trust_center_tab_switch", { tab });
+  };
+
   const toggleFaq = (idx: number) => {
-    setOpenFaq(openFaq === idx ? null : idx);
+    const isOpening = openFaq !== idx;
+    setOpenFaq(isOpening ? idx : null);
+    trackEvent("trust_center_faq_toggle", {
+      faq_index: idx + 1,
+      faq_question: faqs[idx]?.q || "",
+      state: isOpening ? "opened" : "closed",
+    });
   };
 
   const faqs = [
@@ -35,7 +47,7 @@ export default function TrustCenter() {
     },
     {
       q: "Does DIAD copy, mirror, or store our transactional records on D4E servers?",
-      a: "Never. DIAD operates on a strict Zero-Custody Architecture. We maintain zero centralized databases, zero analytical telemetry sinks, and zero external mirrors."
+      a: "Never. DIAD operates on a strict Zero-Custody Architecture. Deployed Cloud Run and BigQuery services maintain zero centralized databases, zero analytical telemetry sinks, and zero external mirrors. (Only the local Setup Wizard includes an optional, 1-click toggleable anonymous stage-timing metric with zero business data or credentials.)"
     },
     {
       q: "Who owns the cloud infrastructure, IAM permissions, and encryption keys?",
@@ -143,7 +155,7 @@ export default function TrustCenter() {
         {/* Tab Controls */}
         <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-4 mb-10">
           <button
-            onClick={() => setActiveTab("architecture")}
+            onClick={() => handleTabChange("architecture")}
             className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all ${
               activeTab === "architecture"
                 ? "bg-electric-cyan text-obsidian shadow-lg shadow-electric-cyan/20"
@@ -155,7 +167,7 @@ export default function TrustCenter() {
           </button>
 
           <button
-            onClick={() => setActiveTab("security")}
+            onClick={() => handleTabChange("security")}
             className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all ${
               activeTab === "security"
                 ? "bg-electric-cyan text-obsidian shadow-lg shadow-electric-cyan/20"
@@ -167,7 +179,7 @@ export default function TrustCenter() {
           </button>
 
           <button
-            onClick={() => setActiveTab("subprocessors")}
+            onClick={() => handleTabChange("subprocessors")}
             className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all ${
               activeTab === "subprocessors"
                 ? "bg-electric-cyan text-obsidian shadow-lg shadow-electric-cyan/20"
@@ -179,7 +191,7 @@ export default function TrustCenter() {
           </button>
 
           <button
-            onClick={() => setActiveTab("legal")}
+            onClick={() => handleTabChange("legal")}
             className={`flex items-center gap-2 px-5 py-3 rounded-xl text-sm font-semibold transition-all ${
               activeTab === "legal"
                 ? "bg-electric-cyan text-obsidian shadow-lg shadow-electric-cyan/20"

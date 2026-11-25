@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
+import { submitPilotRegistration, trackEvent } from "@/lib/analytics";
 import {
   X,
   ShieldCheck,
@@ -15,7 +16,8 @@ import {
   User,
   Globe,
   UploadCloud,
-  ImageIcon
+  ImageIcon,
+  Loader2
 } from "lucide-react";
 
 export interface RegistrationData {
@@ -28,47 +30,169 @@ export interface RegistrationData {
 
 interface PilotRegistrationModalProps {
   isOpen: boolean;
+  triggerSource?: string;
   onClose: () => void;
   onSuccess?: (data: RegistrationData) => void;
 }
 
-export default function PilotRegistrationModal({
-  isOpen,
+interface SavedRegistrationDefaults {
+  fullName: string;
+  brandName: string;
+  workEmail: string;
+  storeUrl: string;
+  logoDataUrl: string;
+  logoFileName: string;
+  logoMimeType: string;
+  hadPrefilledLead: boolean;
+}
+
+function readSavedRegistrationDefaults(): SavedRegistrationDefaults {
+  const empty: SavedRegistrationDefaults = {
+    fullName: "",
+    brandName: "",
+    workEmail: "",
+    storeUrl: "",
+    logoDataUrl: "",
+    logoFileName: "",
+    logoMimeType: "",
+    hadPrefilledLead: false,
+  };
+  if (typeof window === "undefined") return empty;
+
+  try {
+    const saved = JSON.parse(localStorage.getItem("diad_pilot_lead") || "{}");
+    const hasPrefill = Boolean(
+      saved.fullName || saved.brandName || saved.workEmail || saved.storeUrl
+    );
+    const savedLogo = localStorage.getItem("diad_pilot_logo") || "";
+    const match = savedLogo.match(/^data:([^;]+);/);
+    return {
+      fullName: saved.fullName ? String(saved.fullName) : "",
+      brandName: saved.brandName ? String(saved.brandName) : "",
+      workEmail: saved.workEmail ? String(saved.workEmail) : "",
+      storeUrl: saved.storeUrl ? String(saved.storeUrl) : "",
+      logoDataUrl: savedLogo,
+      logoFileName: savedLogo ? "Uploaded Brand Logo" : "",
+      logoMimeType: match?.[1] || "",
+      hadPrefilledLead: hasPrefill,
+    };
+  } catch (err) {
+    console.warn("Could not read saved lead from localStorage", err);
+    return empty;
+  }
+}
+
+function PilotRegistrationModalContent({
+  triggerSource = "unknown",
   onClose,
   onSuccess
-}: PilotRegistrationModalProps) {
-  const [fullName, setFullName] = useState("");
-  const [brandName, setBrandName] = useState("");
-  const [workEmail, setWorkEmail] = useState("");
-  const [storeUrl, setStoreUrl] = useState("");
-  const [logoDataUrl, setLogoDataUrl] = useState<string>("");
-  const [logoFileName, setLogoFileName] = useState<string>("");
+}: Omit<PilotRegistrationModalProps, "isOpen">) {
+  const [defaults] = useState<SavedRegistrationDefaults>(() =>
+    readSavedRegistrationDefaults()
+  );
+  const [fullName, setFullName] = useState(defaults.fullName);
+  const [brandName, setBrandName] = useState(defaults.brandName);
+  const [workEmail, setWorkEmail] = useState(defaults.workEmail);
+  const [storeUrl, setStoreUrl] = useState(defaults.storeUrl);
+  const [logoDataUrl, setLogoDataUrl] = useState<string>(defaults.logoDataUrl);
+  const [logoFileName, setLogoFileName] = useState<string>(defaults.logoFileName);
+  const [logoMimeType, setLogoMimeType] = useState<string>(defaults.logoMimeType);
   const [agreed, setAgreed] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
   const [errorMsg, setErrorMsg] = useState("");
+  const [captureNote, setCaptureNote] = useState("");
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Auto-populate from saved credentials if available, while ensuring user can review/edit
+  // Funnel & abandon tracking refs
+  const modalOpenedAtRef = useRef<number>(0);
+  const touchedFieldsRef = useRef<Set<string>>(new Set());
+  const lastFieldTouchedRef = useRef<string>("");
+  const submittedRef = useRef<boolean>(false);
+  const snapshotRef = useRef({
+    fullName: defaults.fullName,
+    brandName: defaults.brandName,
+    workEmail: defaults.workEmail,
+    storeUrl: defaults.storeUrl,
+    logoDataUrl: defaults.logoDataUrl,
+    agreed: false,
+    triggerSource,
+  });
+
   useEffect(() => {
-    if (isOpen) {
-      try {
-        const saved = JSON.parse(localStorage.getItem("diad_pilot_lead") || "{}");
-        if (saved.fullName) setFullName(saved.fullName);
-        if (saved.brandName) setBrandName(saved.brandName);
-        if (saved.workEmail) setWorkEmail(saved.workEmail);
-        if (saved.storeUrl) setStoreUrl(saved.storeUrl);
-        const savedLogo = localStorage.getItem("diad_pilot_logo");
-        if (savedLogo) {
-          setLogoDataUrl(savedLogo);
-          setLogoFileName("Uploaded Brand Logo");
-        }
-      } catch (err) {
-        console.warn("Could not read saved lead from localStorage", err);
-      }
+    snapshotRef.current = {
+      fullName,
+      brandName,
+      workEmail,
+      storeUrl,
+      logoDataUrl,
+      agreed,
+      triggerSource,
+    };
+  }, [fullName, brandName, workEmail, storeUrl, logoDataUrl, agreed, triggerSource]);
+
+  const trackAbandonIfNeeded = useCallback(() => {
+    if (submittedRef.current || modalOpenedAtRef.current === 0) return;
+    const snap = snapshotRef.current;
+    const completed: string[] = [];
+    if (snap.fullName.trim()) completed.push("full_name");
+    if (snap.brandName.trim()) completed.push("brand_name");
+    if (snap.workEmail.trim()) completed.push("work_email");
+    if (snap.storeUrl.trim()) completed.push("store_url");
+    if (snap.logoDataUrl) completed.push("logo_upload");
+    if (snap.agreed) completed.push("terms_consent");
+
+    const timeInModalSec =
+      Math.round(((Date.now() - modalOpenedAtRef.current) / 1000) * 10) / 10;
+
+    trackEvent(
+      "pilot_modal_abandon",
+      {
+        last_field_touched: lastFieldTouchedRef.current || "none",
+        fields_completed: completed.join(","),
+        fields_completed_count: completed.length,
+        had_logo: Boolean(snap.logoDataUrl),
+        had_consent: snap.agreed,
+        time_in_modal_sec: timeInModalSec,
+        trigger_source: snap.triggerSource,
+      },
+      { beacon: true }
+    );
+    modalOpenedAtRef.current = 0;
+  }, []);
+
+  useEffect(() => {
+    modalOpenedAtRef.current = Date.now();
+    touchedFieldsRef.current = new Set();
+    lastFieldTouchedRef.current = "";
+    submittedRef.current = false;
+
+    trackEvent("pilot_modal_open", {
+      trigger_source: triggerSource,
+      had_prefilled_lead: defaults.hadPrefilledLead,
+    });
+
+    const handlePageHide = () => {
+      trackAbandonIfNeeded();
+    };
+    window.addEventListener("pagehide", handlePageHide);
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+    };
+  }, [triggerSource, defaults.hadPrefilledLead, trackAbandonIfNeeded]);
+
+  const markFieldTouched = (fieldName: string) => {
+    lastFieldTouchedRef.current = fieldName;
+    if (!touchedFieldsRef.current.has(fieldName)) {
+      touchedFieldsRef.current.add(fieldName);
+      trackEvent("pilot_field_interacted", {
+        field_name: fieldName,
+        trigger_source: triggerSource,
+      });
     }
-  }, [isOpen]);
+  };
 
   // Generate dynamic tailored PowerShell command
   const dynamicPsCommand = brandName.trim()
@@ -81,20 +205,27 @@ export default function PilotRegistrationModal({
 
     if (!file.type.startsWith("image/")) {
       setErrorMsg("Please upload a valid image file (PNG, SVG, or JPG).");
+      trackEvent("pilot_logo_error", { reason: "invalid_type" });
       return;
     }
 
     if (file.size > 5 * 1024 * 1024) {
       setErrorMsg("Logo image must be smaller than 5MB.");
+      trackEvent("pilot_logo_error", { reason: "file_too_large" });
       return;
     }
 
     setLogoFileName(file.name);
+    setLogoMimeType(file.type);
     const reader = new FileReader();
     reader.onload = (event) => {
       const result = event.target?.result as string;
       setLogoDataUrl(result);
       setErrorMsg("");
+      trackEvent("pilot_logo_selected", {
+        file_type: file.type,
+        file_size_kb: Math.round(file.size / 1024),
+      });
     };
     reader.readAsDataURL(file);
   };
@@ -102,47 +233,14 @@ export default function PilotRegistrationModal({
   const removeLogo = () => {
     setLogoDataUrl("");
     setLogoFileName("");
+    setLogoMimeType("");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    trackEvent("pilot_logo_removed", { trigger_source: triggerSource });
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!fullName.trim() || !brandName.trim() || !workEmail.trim() || !storeUrl.trim()) {
-      setErrorMsg("Please complete all required fields.");
-      return;
-    }
-    if (!agreed) {
-      setErrorMsg("Please accept the Free Community License and Pilot Agreement.");
-      return;
-    }
-
-    setErrorMsg("");
-    const leadData: RegistrationData = {
-      fullName: fullName.trim(),
-      brandName: brandName.trim(),
-      workEmail: workEmail.trim(),
-      storeUrl: storeUrl.trim(),
-      logoDataUrl
-    };
-
-    // Store consent, registration, and logo locally
-    try {
-      localStorage.setItem(
-        "diad_pilot_lead",
-        JSON.stringify({
-          ...leadData,
-          registeredAt: new Date().toISOString(),
-          consentAccepted: true
-        })
-      );
-      if (logoDataUrl) {
-        localStorage.setItem("diad_pilot_logo", logoDataUrl);
-      }
-    } catch {}
-
-    // Generate dynamic setup.bat pre-filled with client's business details
+  const triggerBatDownload = () => {
     const cleanBiz = brandName.replace(/["^&|<>]/g, "");
     const cleanUrl = storeUrl.replace(/["^&|<>]/g, "");
     const cleanEmail = workEmail.replace(/["^&|<>]/g, "");
@@ -195,25 +293,124 @@ if errorlevel 1 (
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(blobUrl);
+  };
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (isSubmitting) return;
+
+    if (!fullName.trim() || !brandName.trim() || !workEmail.trim() || !storeUrl.trim()) {
+      setErrorMsg("Please complete all required fields.");
+      return;
+    }
+    if (!agreed) {
+      setErrorMsg("Please accept the Free Community License and Pilot Agreement.");
+      return;
+    }
+
+    setErrorMsg("");
+    setIsSubmitting(true);
+
+    const registeredAt = new Date().toISOString();
+    const leadData: RegistrationData = {
+      fullName: fullName.trim(),
+      brandName: brandName.trim(),
+      workEmail: workEmail.trim(),
+      storeUrl: storeUrl.trim(),
+      logoDataUrl
+    };
+
+    try {
+      localStorage.setItem(
+        "diad_pilot_lead",
+        JSON.stringify({
+          ...leadData,
+          registeredAt,
+          consentAccepted: true
+        })
+      );
+      if (logoDataUrl) {
+        localStorage.setItem("diad_pilot_logo", logoDataUrl);
+      }
+    } catch { }
+
+    const timeInModalSec =
+      modalOpenedAtRef.current > 0
+        ? Math.round(((Date.now() - modalOpenedAtRef.current) / 1000) * 10) / 10
+        : 0;
+
+    const captureResult = await submitPilotRegistration({
+      ...leadData,
+      logoFileName: logoFileName || undefined,
+      logoMimeType: logoMimeType || undefined,
+      consentAccepted: true,
+      registeredAt,
+      triggerSource,
+    });
+
+    submittedRef.current = true;
+    setCaptureNote(
+      captureResult.channel === "cloudflare"
+        ? "Pilot license & brand profile registered."
+        : captureResult.channel === "formspree"
+          ? "Pilot registration recorded."
+          : ""
+    );
+
+    trackEvent("pilot_registration_submit", {
+      has_logo: Boolean(logoDataUrl),
+      logo_file_type: logoMimeType || "none",
+      time_in_modal_sec: timeInModalSec,
+      trigger_source: triggerSource,
+      capture_channel: captureResult.channel,
+      logo_saved_server: captureResult.logoSaved,
+    });
+
+    trackEvent("generate_lead", {
+      lead_type: "diad_pilot",
+      has_logo: Boolean(logoDataUrl),
+      capture_channel: captureResult.channel,
+    });
+
+    trackEvent("installer_download", {
+      filename: "setup.bat",
+      download_type: "initial",
+      has_logo: Boolean(logoDataUrl),
+    });
+
+    triggerBatDownload();
+
+    setIsSubmitting(false);
     setIsSubmitted(true);
     if (onSuccess) {
       onSuccess(leadData);
     }
   };
 
+  const handleDownloadAgain = () => {
+    triggerBatDownload();
+    trackEvent("installer_download_again", {
+      filename: "setup.bat",
+    });
+  };
+
   const handleCopyCommand = () => {
     navigator.clipboard.writeText(dynamicPsCommand);
     setCopied(true);
+    trackEvent("ps_command_copied_post_signup", {
+      has_custom_biz: Boolean(brandName.trim()),
+    });
     setTimeout(() => setCopied(false), 3000);
   };
 
   const handleReset = () => {
+    if (!isSubmitted) {
+      trackAbandonIfNeeded();
+    }
     setIsSubmitted(false);
+    setCaptureNote("");
     onClose();
   };
-
-  if (!isOpen) return null;
 
   return (
     <AnimatePresence>
@@ -278,7 +475,11 @@ if errorlevel 1 (
                       type="text"
                       required
                       value={fullName}
-                      onChange={(e) => setFullName(e.target.value)}
+                      onFocus={() => markFieldTouched("full_name")}
+                      onChange={(e) => {
+                        markFieldTouched("full_name");
+                        setFullName(e.target.value);
+                      }}
                       placeholder="e.g. Alex Tan"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate/40 border border-slate focus:border-electric-cyan focus:outline-none text-sm text-white placeholder-gray-500"
                     />
@@ -293,7 +494,11 @@ if errorlevel 1 (
                       type="text"
                       required
                       value={brandName}
-                      onChange={(e) => setBrandName(e.target.value)}
+                      onFocus={() => markFieldTouched("brand_name")}
+                      onChange={(e) => {
+                        markFieldTouched("brand_name");
+                        setBrandName(e.target.value);
+                      }}
                       placeholder="e.g. Acme Lifestyle"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate/40 border border-slate focus:border-electric-cyan focus:outline-none text-sm text-white placeholder-gray-500"
                     />
@@ -310,7 +515,11 @@ if errorlevel 1 (
                       type="email"
                       required
                       value={workEmail}
-                      onChange={(e) => setWorkEmail(e.target.value)}
+                      onFocus={() => markFieldTouched("work_email")}
+                      onChange={(e) => {
+                        markFieldTouched("work_email");
+                        setWorkEmail(e.target.value);
+                      }}
                       placeholder="alex@acmelifestyle.com"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate/40 border border-slate focus:border-electric-cyan focus:outline-none text-sm text-white placeholder-gray-500"
                     />
@@ -325,7 +534,11 @@ if errorlevel 1 (
                       type="text"
                       required
                       value={storeUrl}
-                      onChange={(e) => setStoreUrl(e.target.value)}
+                      onFocus={() => markFieldTouched("store_url")}
+                      onChange={(e) => {
+                        markFieldTouched("store_url");
+                        setStoreUrl(e.target.value);
+                      }}
                       placeholder="https://acmelifestyle.com"
                       className="w-full px-3.5 py-2.5 rounded-xl bg-slate/40 border border-slate focus:border-electric-cyan focus:outline-none text-sm text-white placeholder-gray-500"
                     />
@@ -342,7 +555,13 @@ if errorlevel 1 (
 
                   {!logoDataUrl ? (
                     <div
-                      onClick={() => fileInputRef.current?.click()}
+                      onClick={() => {
+                        markFieldTouched("logo_upload");
+                        trackEvent("pilot_logo_picker_click", {
+                          trigger_source: triggerSource,
+                        });
+                        fileInputRef.current?.click();
+                      }}
                       className="border border-dashed border-slate hover:border-electric-cyan/60 rounded-xl p-3.5 text-center cursor-pointer bg-slate/20 hover:bg-slate/30 transition-colors flex items-center justify-center gap-3"
                     >
                       <UploadCloud className="w-5 h-5 text-electric-cyan" />
@@ -351,7 +570,7 @@ if errorlevel 1 (
                           Click to upload your brand logo
                         </p>
                         <p className="text-[0.7rem] text-gray-400">
-                          Used to personalize your chatbots & feature your store as a partner
+                          Used to personalize your chatbots &amp; feature your store as a partner
                         </p>
                       </div>
                     </div>
@@ -397,16 +616,33 @@ if errorlevel 1 (
                     <input
                       type="checkbox"
                       checked={agreed}
-                      onChange={(e) => setAgreed(e.target.checked)}
+                      onChange={(e) => {
+                        markFieldTouched("terms_consent");
+                        setAgreed(e.target.checked);
+                      }}
                       className="mt-1 w-4 h-4 rounded border-slate text-electric-cyan focus:ring-0 focus:outline-none cursor-pointer"
                     />
                     <span className="text-xs text-gray-300 leading-relaxed">
                       I agree to the{" "}
-                      <Link href="/diad/terms" target="_blank" className="text-electric-cyan underline hover:text-white">
+                      <Link
+                        href="/diad/terms"
+                        target="_blank"
+                        onClick={() =>
+                          trackEvent("pilot_legal_link_click", { target: "terms" })
+                        }
+                        className="text-electric-cyan underline hover:text-white"
+                      >
                         DIAD Free Community Terms
                       </Link>{" "}
                       and{" "}
-                      <Link href="/diad/privacy" target="_blank" className="text-electric-cyan underline hover:text-white">
+                      <Link
+                        href="/diad/privacy"
+                        target="_blank"
+                        onClick={() =>
+                          trackEvent("pilot_legal_link_click", { target: "privacy" })
+                        }
+                        className="text-electric-cyan underline hover:text-white"
+                      >
                         Privacy Policy
                       </Link>
                       . In exchange for free self-hosted platform access, I grant Data for Entrepreneurs permission to display our brand name and logo on d4e.ai as an early pilot partner.
@@ -417,15 +653,23 @@ if errorlevel 1 (
                 {/* Submit button */}
                 <button
                   type="submit"
-                  disabled={!agreed}
-                  className={`w-full py-3.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg ${
-                    agreed
-                      ? "bg-gradient-to-r from-electric-cyan to-emerald-400 text-obsidian hover:opacity-95 shadow-electric-cyan/20 cursor-pointer"
-                      : "bg-slate/50 text-gray-500 cursor-not-allowed border border-slate"
-                  }`}
+                  disabled={!agreed || isSubmitting}
+                  className={`w-full py-3.5 px-6 rounded-xl font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-lg ${agreed && !isSubmitting
+                    ? "bg-gradient-to-r from-electric-cyan to-emerald-400 text-obsidian hover:opacity-95 shadow-electric-cyan/20 cursor-pointer"
+                    : "bg-slate/50 text-gray-500 cursor-not-allowed border border-slate"
+                    }`}
                 >
-                  <Download className="w-4 h-4" />
-                  Agree & Download Setup Kit (.bat)
+                  {isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Activating &amp; Preparing Setup Kit...
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-4 h-4" />
+                      Agree &amp; Download Setup Kit (.bat)
+                    </>
+                  )}
                 </button>
               </form>
             </div>
@@ -440,6 +684,11 @@ if errorlevel 1 (
               </h3>
               <p className="text-gray-300 text-xs sm:text-sm max-w-md mx-auto mb-6 leading-relaxed">
                 Your personalized <code className="text-electric-cyan font-mono">setup.bat</code> has been downloaded. Follow the 3 steps below to launch your onboarding suite.
+                {captureNote ? (
+                  <span className="block text-emerald-400 text-[0.72rem] font-mono mt-1.5">
+                    ✓ {captureNote}
+                  </span>
+                ) : null}
               </p>
 
               {/* Onboarding Instructions */}
@@ -477,7 +726,7 @@ if errorlevel 1 (
 
               <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
                 <button
-                  onClick={handleSubmit}
+                  onClick={handleDownloadAgain}
                   className="w-full sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-slate hover:bg-slate/80 text-white text-xs font-semibold transition-colors cursor-pointer"
                 >
                   <Download className="w-3.5 h-3.5" />
@@ -495,5 +744,21 @@ if errorlevel 1 (
         </motion.div>
       </div>
     </AnimatePresence>
+  );
+}
+
+export default function PilotRegistrationModal({
+  isOpen,
+  triggerSource = "unknown",
+  onClose,
+  onSuccess
+}: PilotRegistrationModalProps) {
+  if (!isOpen) return null;
+  return (
+    <PilotRegistrationModalContent
+      triggerSource={triggerSource}
+      onClose={onClose}
+      onSuccess={onSuccess}
+    />
   );
 }
