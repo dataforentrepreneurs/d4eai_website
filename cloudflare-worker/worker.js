@@ -32,7 +32,7 @@ const MAX_REGISTER_BODY_BYTES = 7.5 * 1024 * 1024;
 function getCorsHeaders(request) {
   const origin = request.headers.get("Origin") || "";
   const headers = {
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
     "Access-Control-Allow-Headers": "Content-Type, Authorization, Accept",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
@@ -716,6 +716,345 @@ async function handleAdminLogo(request, env, encodedKey) {
   });
 }
 
+async function handleAdminLogoDelete(request, env, encodedKey) {
+  if (!(await requireAdminAuth(request, env))) {
+    return jsonResponse({ ok: false, error: "Unauthorized" }, 401, request);
+  }
+
+  const key = decodeURIComponent(encodedKey);
+  if (!key.startsWith("logos/") || key.includes("..")) {
+    return jsonResponse({ ok: false, error: "Invalid logo key" }, 400, request);
+  }
+
+  if (env.LOGOS_BUCKET) {
+    await env.LOGOS_BUCKET.delete(key);
+  }
+
+  return jsonResponse({ ok: true, deleted: key }, 200, request);
+}
+
+function isLikelyCrawlerSession(ses) {
+  const startedAt = String(ses?.started_at || "");
+  const city = String(ses?.city || "");
+  const active = toNum(ses?.total_active_sec, 0);
+  const scroll = toNum(ses?.max_scroll_percent, 0);
+  const modalOpened = toNum(ses?.modal_opened, 0);
+  const converted = toNum(ses?.converted, 0);
+  if (city === "Council Bluffs" && startedAt.includes("T00:00:00.")) {
+    return true;
+  }
+  if (
+    city === "Council Bluffs" &&
+    active <= 1 &&
+    scroll === 0 &&
+    !modalOpened &&
+    !converted
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function summarizeSessionWindow(sessions) {
+  let totalSessions = 0;
+  let humanSessions = 0;
+  let botSessions = 0;
+  let onboardingSessions = 0;
+  let modalOpens = 0;
+  let conversions = 0;
+  let sumActive = 0;
+  let sumStay = 0;
+  let sumScroll = 0;
+  const visitorsAll = new Set();
+  const visitorsHuman = new Set();
+
+  for (const s of sessions || []) {
+    totalSessions += 1;
+    if (s.visitor_id) visitorsAll.add(s.visitor_id);
+    const isOnboarding =
+      String(s.session_id || "").startsWith("ob_") ||
+      String(s.landing_page || "").startsWith("/onboarding");
+    if (isOnboarding) onboardingSessions += 1;
+
+    if (isLikelyCrawlerSession(s)) {
+      botSessions += 1;
+      continue;
+    }
+
+    humanSessions += 1;
+    if (s.visitor_id) visitorsHuman.add(s.visitor_id);
+    modalOpens += toNum(s.modal_opened, 0) > 0 ? 1 : 0;
+    conversions += toNum(s.converted, 0) > 0 ? 1 : 0;
+    sumActive += toNum(s.total_active_sec, 0);
+    sumStay += toNum(s.total_stay_sec, 0);
+    sumScroll += toNum(s.max_scroll_percent, 0);
+  }
+
+  const websiteHumanSessions = Math.max(0, humanSessions - onboardingSessions);
+  return {
+    total_sessions: totalSessions,
+    human_sessions: humanSessions,
+    website_human_sessions: websiteHumanSessions,
+    onboarding_sessions: onboardingSessions,
+    bot_sessions: botSessions,
+    unique_visitors: visitorsAll.size,
+    human_unique_visitors: visitorsHuman.size,
+    total_modal_opens: modalOpens,
+    total_conversions: conversions,
+    avg_active_sec: humanSessions ? Math.round((sumActive / humanSessions) * 10) / 10 : 0,
+    avg_stay_sec: humanSessions ? Math.round((sumStay / humanSessions) * 10) / 10 : 0,
+    avg_scroll_percent: humanSessions ? Math.round((sumScroll / humanSessions) * 10) / 10 : 0,
+  };
+}
+
+async function handleAdminWeekly(request, env) {
+  if (!(await requireAdminAuth(request, env))) {
+    return jsonResponse({ ok: false, error: "Unauthorized" }, 401, request);
+  }
+
+  const url = new URL(request.url);
+  const days = Math.max(1, Math.min(90, Math.round(toNum(url.searchParams.get("days"), 7))));
+  const nowMs = Date.now();
+  const dayMs = 86400000;
+  const nowIso = new Date(nowMs).toISOString();
+  const sinceIso = new Date(nowMs - days * dayMs).toISOString();
+  const prevSinceIso = new Date(nowMs - 2 * days * dayMs).toISOString();
+
+  const [
+    currSessionsRes,
+    prevSessionsRes,
+    regsRes,
+    videoEventsRes,
+    dropoffsRes,
+    modalAbandonsRes,
+    onboardingTabsRes,
+    onboardingStepsRes,
+  ] = await Promise.all([
+    env.DB.prepare(
+      `SELECT * FROM sessions WHERE last_seen_at >= ? ORDER BY last_seen_at DESC LIMIT 1000`
+    ).bind(sinceIso).all(),
+    env.DB.prepare(
+      `SELECT session_id, visitor_id, started_at, last_seen_at, landing_page, city,
+              total_stay_sec, total_active_sec, max_scroll_percent, modal_opened, converted
+       FROM sessions WHERE last_seen_at >= ? AND last_seen_at < ? LIMIT 1000`
+    ).bind(prevSinceIso, sinceIso).all(),
+    env.DB.prepare(
+      `SELECT * FROM pilot_registrations WHERE created_at >= ? ORDER BY created_at DESC LIMIT 200`
+    ).bind(sinceIso).all(),
+    env.DB.prepare(
+      `SELECT session_id, event_name, active_sec, total_sec, payload_json
+       FROM events
+       WHERE created_at >= ? AND event_name LIKE 'video_%'
+       ORDER BY id ASC LIMIT 2000`
+    ).bind(sinceIso).all(),
+    env.DB.prepare(
+      `SELECT last_section_seen, COUNT(*) as sessions_count,
+              AVG(total_active_sec) as avg_active_sec,
+              AVG(max_scroll_percent) as avg_scroll
+       FROM sessions
+       WHERE last_seen_at >= ?
+       GROUP BY last_section_seen
+       ORDER BY sessions_count DESC LIMIT 30`
+    ).bind(sinceIso).all(),
+    env.DB.prepare(
+      `SELECT modal_abandoned_field, COUNT(*) as count
+       FROM sessions
+       WHERE last_seen_at >= ? AND modal_opened = 1 AND converted = 0
+       GROUP BY modal_abandoned_field
+       ORDER BY count DESC`
+    ).bind(sinceIso).all(),
+    env.DB.prepare(
+      `SELECT section_name as tab_name,
+              COUNT(*) as visits,
+              SUM(CASE WHEN payload_json LIKE '%"next_tab":"session_exit"%' THEN 1 ELSE 0 END) as exits,
+              AVG(active_sec) as avg_active_sec,
+              MAX(active_sec) as max_active_sec,
+              AVG(total_sec) as avg_total_sec
+       FROM events
+       WHERE created_at >= ? AND event_name = 'onboarding_tab_leave'
+       GROUP BY section_name
+       ORDER BY avg_active_sec DESC`
+    ).bind(sinceIso).all(),
+    env.DB.prepare(
+      `SELECT section_name as step_name,
+              COUNT(*) as runs,
+              SUM(CASE WHEN event_name = 'onboarding_pipeline_step_complete' THEN 1 ELSE 0 END) as successes,
+              SUM(CASE WHEN event_name = 'onboarding_pipeline_step_error' THEN 1 ELSE 0 END) as errors,
+              AVG(active_sec) as avg_exec_sec
+       FROM events
+       WHERE created_at >= ?
+         AND event_name IN ('onboarding_pipeline_step_complete', 'onboarding_pipeline_step_error')
+       GROUP BY section_name
+       ORDER BY section_name ASC`
+    ).bind(sinceIso).all(),
+  ]);
+
+  const currSessions = currSessionsRes.results || [];
+  const prevSessions = prevSessionsRes.results || [];
+  const registrations = regsRes.results || [];
+  const summary = summarizeSessionWindow(currSessions);
+  summary.registrations_count = registrations.length;
+  summary.logos_count = registrations.filter((r) => toNum(r.has_logo, 0) > 0).length;
+
+  const previousSummary = summarizeSessionWindow(prevSessions);
+
+  // Daily trend, acquisition sources, geo breakdown (excluding bots from human engagement breakdown)
+  const dailyMap = {};
+  const sourceMap = {};
+  const geoMap = {};
+
+  for (const s of currSessions) {
+    const dayKey = String(s.last_seen_at || "").slice(0, 10) || "unknown";
+    if (!dailyMap[dayKey]) {
+      dailyMap[dayKey] = { date: dayKey, total_sessions: 0, human_sessions: 0, bot_sessions: 0, conversions: 0 };
+    }
+    dailyMap[dayKey].total_sessions += 1;
+    const isBot = isLikelyCrawlerSession(s);
+    if (isBot) {
+      dailyMap[dayKey].bot_sessions += 1;
+      continue;
+    }
+    dailyMap[dayKey].human_sessions += 1;
+    dailyMap[dayKey].conversions += toNum(s.converted, 0) > 0 ? 1 : 0;
+
+    let srcLabel = "direct";
+    if (s.ref_tag) {
+      srcLabel = `ref:${s.ref_tag}`;
+    } else if (s.utm_source) {
+      srcLabel = s.utm_medium ? `${s.utm_source} / ${s.utm_medium}` : String(s.utm_source);
+    } else if (s.referrer) {
+      srcLabel = String(s.referrer).replace(/^https?:\/\//, "").split("/")[0] || "referrer";
+    }
+    if (!sourceMap[srcLabel]) {
+      sourceMap[srcLabel] = { source: srcLabel, sessions: 0, conversions: 0, sum_active_sec: 0 };
+    }
+    sourceMap[srcLabel].sessions += 1;
+    sourceMap[srcLabel].conversions += toNum(s.converted, 0) > 0 ? 1 : 0;
+    sourceMap[srcLabel].sum_active_sec += toNum(s.total_active_sec, 0);
+
+    const geoLabel = [s.city, s.country].filter(Boolean).join(", ") || "Unknown";
+    if (!geoMap[geoLabel]) {
+      geoMap[geoLabel] = { location: geoLabel, sessions: 0, conversions: 0 };
+    }
+    geoMap[geoLabel].sessions += 1;
+    geoMap[geoLabel].conversions += toNum(s.converted, 0) > 0 ? 1 : 0;
+  }
+
+  const dailyTrend = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
+  const sources = Object.values(sourceMap)
+    .map((x) => ({
+      source: x.source,
+      sessions: x.sessions,
+      conversions: x.conversions,
+      avg_active_sec: x.sessions ? Math.round((x.sum_active_sec / x.sessions) * 10) / 10 : 0,
+    }))
+    .sort((a, b) => b.sessions - a.sessions)
+    .slice(0, 20);
+  const countries = Object.values(geoMap).sort((a, b) => b.sessions - a.sessions).slice(0, 20);
+
+  // Aggregate video engagement & drop-off chapters from video_* events
+  const perSessionVideo = {};
+  const videoTitleMap = {};
+  for (const ev of videoEventsRes.results || []) {
+    const p = safeJsonParse(ev.payload_json, {});
+    const vid = String(p.video_id || "").trim();
+    if (!vid) continue;
+    if (p.video_title) videoTitleMap[vid] = String(p.video_title);
+
+    const key = `${ev.session_id}::${vid}`;
+    if (!perSessionVideo[key]) {
+      perSessionVideo[key] = {
+        video_id: vid,
+        session_id: ev.session_id,
+        started: false,
+        completed: false,
+        max_percent: 0,
+        last_chapter: "",
+        chapters: new Set(),
+      };
+    }
+    const rec = perSessionVideo[key];
+    if (ev.event_name === "video_start" || ev.event_name === "video_play") {
+      rec.started = true;
+    }
+    if (ev.event_name === "video_ended") {
+      rec.completed = true;
+      rec.max_percent = 100;
+    }
+    const pct = toNum(p.progress_percent ?? p.percent_watched, 0);
+    if (pct > rec.max_percent) rec.max_percent = pct;
+    const ch = String(p.chapter_title || p.active_chapter || "").trim();
+    if (ch) {
+      rec.chapters.add(ch);
+      rec.last_chapter = ch;
+    }
+  }
+
+  const videoAgg = {};
+  for (const rec of Object.values(perSessionVideo)) {
+    const vid = rec.video_id;
+    if (!videoAgg[vid]) {
+      videoAgg[vid] = {
+        video_id: vid,
+        video_title: videoTitleMap[vid] || vid,
+        viewers: 0,
+        completions: 0,
+        sum_max_percent: 0,
+        chapter_views: {},
+        dropoff_chapters: {},
+      };
+    }
+    const v = videoAgg[vid];
+    v.viewers += 1;
+    if (rec.completed || rec.max_percent >= 95) {
+      v.completions += 1;
+    } else if (rec.last_chapter) {
+      v.dropoff_chapters[rec.last_chapter] = (v.dropoff_chapters[rec.last_chapter] || 0) + 1;
+    }
+    v.sum_max_percent += rec.max_percent;
+    for (const ch of rec.chapters) {
+      v.chapter_views[ch] = (v.chapter_views[ch] || 0) + 1;
+    }
+  }
+
+  const videos = Object.values(videoAgg).map((v) => ({
+    video_id: v.video_id,
+    video_title: v.video_title,
+    viewers: v.viewers,
+    completions: v.completions,
+    completion_rate_pct: v.viewers ? Math.round((v.completions / v.viewers) * 100) : 0,
+    avg_max_percent: v.viewers ? Math.round((v.sum_max_percent / v.viewers) * 10) / 10 : 0,
+    chapter_views: Object.entries(v.chapter_views)
+      .map(([chapter, views]) => ({ chapter, views }))
+      .sort((a, b) => b.views - a.views),
+    top_dropoff_chapters: Object.entries(v.dropoff_chapters)
+      .map(([chapter, dropoffs]) => ({ chapter, dropoffs }))
+      .sort((a, b) => b.dropoffs - a.dropoffs),
+  }));
+
+  return jsonResponse(
+    {
+      ok: true,
+      source: "First-Party Telemetry (Cloudflare D1/R2)",
+      window: { days, since: sinceIso, until: nowIso, previous_since: prevSinceIso },
+      summary,
+      previousSummary,
+      dailyTrend,
+      sources,
+      countries,
+      registrations,
+      videos,
+      dropoffs: dropoffsRes.results || [],
+      modalAbandons: modalAbandonsRes.results || [],
+      onboardingTabs: onboardingTabsRes.results || [],
+      onboardingSteps: onboardingStepsRes.results || [],
+      recentSessions: currSessions.slice(0, 50),
+    },
+    200,
+    request
+  );
+}
+
 function renderAdminHtml() {
   return `<!DOCTYPE html>
 <html lang="en">
@@ -1088,6 +1427,10 @@ export default {
         return await handleAdminData(request, env);
       }
 
+      if (request.method === "GET" && path === "/api/admin/weekly") {
+        return await handleAdminWeekly(request, env);
+      }
+
       if (request.method === "GET" && path.startsWith("/api/admin/session/")) {
         const sessionId = decodeURIComponent(path.slice("/api/admin/session/".length));
         return await handleAdminSessionDetail(request, env, sessionId);
@@ -1096,6 +1439,11 @@ export default {
       if (request.method === "GET" && path.startsWith("/api/admin/logo/")) {
         const encodedKey = path.slice("/api/admin/logo/".length);
         return await handleAdminLogo(request, env, encodedKey);
+      }
+
+      if (request.method === "DELETE" && path.startsWith("/api/admin/logo/")) {
+        const encodedKey = path.slice("/api/admin/logo/".length);
+        return await handleAdminLogoDelete(request, env, encodedKey);
       }
 
       return jsonResponse({ ok: false, error: "Not found" }, 404, request);
